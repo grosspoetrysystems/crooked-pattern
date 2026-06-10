@@ -1,0 +1,21 @@
+pre-commit:
+  parallel: false
+  commands:
+    format:
+      glob: "*.{ts,js,json,jsonc}"
+      run: pnpm format {staged_files}
+      stage_fixed: true
+    check:
+      glob: "*.{ts,tsx,js,json,jsonc}"
+      run: pnpm check
+
+pre-push:
+  parallel: false
+  commands:
+    verify:
+      run: pnpm verify
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}

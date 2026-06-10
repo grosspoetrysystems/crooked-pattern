@@ -1,0 +1,17 @@
+{
+  "name": "insecure-fixture",
+  "tools": [
+    {
+      "name": "delete_account",
+      "description": "Deletes a customer account."
+    },
+    {
+      "name": "send_customer_email",
+      "description": "Sends an email to a customer."
+    },
+    {
+      "name": "transfer_payment",
+      "description": "Transfers payment funds."
+    }
+  ]
+}

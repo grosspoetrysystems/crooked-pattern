@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "origins": {
+    "rack-mount-ts": {
+      "type": "external",
+      "source": "local:/Users/kd-m2air/Local/rack-mount/rack-mount-ts",
+      "installedAt": "2026-06-10T08:29:23.158Z"
+    }
+  }
+}

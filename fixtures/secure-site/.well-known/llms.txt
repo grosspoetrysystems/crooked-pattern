@@ -1,0 +1,5 @@
+# Secure Readable Fixture
+
+This fixture describes public, readable ARS test content for agent ingestion.
+
+- [Home](https://example.test/)
