@@ -20,8 +20,8 @@ export interface CheckResult {
   score: number;
   deterministic: boolean;
   metadata?: {
-    confidence?: 'high' | 'heuristic';
-    status?: 'implemented' | 'partial';
+    confidence?: 'high' | 'heuristic' | 'unknown';
+    status?: 'implemented' | 'partial' | 'adapter_missing';
     labels?: string[];
   };
   notes: string[];

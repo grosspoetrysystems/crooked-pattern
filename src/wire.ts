@@ -147,7 +147,10 @@ export async function runWirePass(
     )
   );
 
-  const textLen = rendered?.text.length ?? visibleText(html).length;
+  const renderedText = rendered?.text.trim();
+  const visibleTextSource = renderedText ? 'rendered' : 'fetch';
+  const textLen = (renderedText ?? visibleText(html)).length;
+  const hasTextEvidence = Boolean(renderedText || page);
   results.push(
     check(
       'wire.initial_html_content',
@@ -159,18 +162,23 @@ export async function runWirePass(
         ? 'pass'
         : textLen > 200
           ? 'partial'
-          : page
+          : hasTextEvidence
             ? 'fail'
             : 'unknown',
       textLen > 600 ? 100 : textLen > 200 ? 60 : 0,
       [
-        `Initial HTML visible text length: ${textLen}. Fetch-only SSR/CSR detection is heuristic until the Playwright adapter is implemented.`,
+        visibleTextSource === 'rendered'
+          ? `Rendered visible text length: ${textLen}.`
+          : `Initial HTML visible text length: ${textLen}. Fetch-only SSR/CSR detection is heuristic without rendered DOM evidence.`,
       ],
       {
         metadata: {
-          confidence: 'heuristic',
-          status: 'partial',
-          labels: ['fetch-only'],
+          confidence: visibleTextSource === 'rendered' ? 'high' : 'heuristic',
+          status: visibleTextSource === 'rendered' ? 'implemented' : 'partial',
+          labels:
+            visibleTextSource === 'rendered'
+              ? ['rendered-dom']
+              : ['fetch-only'],
         },
       }
     )
@@ -399,10 +407,15 @@ export async function runWirePass(
       [`Images: ${images.length}; missing alt: ${missingAlt}.`]
     )
   );
+  const renderedFields = rendered
+    ? analyzeRenderedFields(rendered.interactive)
+    : undefined;
   const inputs = html.match(/<input\b[^>]*>/gi) ?? [];
-  const unlabeled = inputs.filter(
+  const staticUnlabeled = inputs.filter(
     (tag) => !/\b(aria-label|aria-labelledby|id)=/i.test(tag)
   ).length;
+  const fieldTotal = renderedFields?.total ?? inputs.length;
+  const unlabeled = renderedFields?.unlabeled ?? staticUnlabeled;
   results.push(
     check(
       'wire.labeled_fields',
@@ -413,13 +426,56 @@ export async function runWirePass(
       unlabeled === 0 ? 'pass' : 'partial',
       unlabeled === 0 ? 100 : 50,
       [
-        `Inputs: ${inputs.length}; potentially unlabeled: ${unlabeled}. Static label detection is heuristic until axe-core/rendered DOM checks are implemented.`,
+        renderedFields
+          ? `Rendered form fields: ${fieldTotal}; without accessible name: ${unlabeled}.`
+          : `Inputs: ${fieldTotal}; potentially unlabeled: ${unlabeled}. Static label detection is heuristic without rendered DOM evidence.`,
       ],
       {
         metadata: {
-          confidence: 'heuristic',
-          status: 'partial',
-          labels: ['static-html'],
+          confidence: renderedFields ? 'high' : 'heuristic',
+          status: renderedFields ? 'implemented' : 'partial',
+          labels: renderedFields
+            ? ['rendered-dom', 'accessible-name']
+            : ['static-html'],
+        },
+      }
+    )
+  );
+  const accessibility = rendered?.accessibility;
+  results.push(
+    check(
+      'wire.accessibility_probe',
+      'rendered accessibility probe',
+      'navigability_stability',
+      'WIRE_ONLY',
+      3,
+      accessibility
+        ? accessibility.violations === 0
+          ? 'pass'
+          : accessibility.violations <= 3
+            ? 'partial'
+            : 'fail'
+        : 'unknown',
+      accessibility
+        ? accessibility.violations === 0
+          ? 100
+          : accessibility.violations <= 3
+            ? 60
+            : 0
+        : 0,
+      [
+        accessibility
+          ? `Rendered accessibility summary: ${accessibility.violations} violation(s), ${accessibility.incomplete} incomplete, ${accessibility.passes} pass(es).`
+          : 'Rendered accessibility adapter evidence was unavailable.',
+      ],
+      {
+        wire_value: accessibility,
+        metadata: {
+          confidence: accessibility ? 'high' : 'unknown',
+          status: accessibility ? 'implemented' : 'adapter_missing',
+          labels: accessibility
+            ? ['rendered-dom', 'accessibility-summary']
+            : ['adapter-missing'],
         },
       }
     )
@@ -438,6 +494,7 @@ export async function runWirePass(
       [`Non-descriptive link labels: ${badLinks}.`]
     )
   );
+  const cls = rendered?.metrics?.cumulativeLayoutShift;
   results.push(
     check(
       'wire.cls_probe',
@@ -445,11 +502,33 @@ export async function runWirePass(
       'navigability_stability',
       'WIRE_ONLY',
       3,
-      'unknown',
-      0,
+      typeof cls === 'number'
+        ? cls <= 0.1
+          ? 'pass'
+          : cls <= 0.25
+            ? 'partial'
+            : 'fail'
+        : 'unknown',
+      typeof cls === 'number' ? (cls <= 0.1 ? 100 : cls <= 0.25 ? 60 : 0) : 0,
       [
-        'Headless browser CLS measurement is not installed in this Phase 1 static runtime.',
-      ]
+        typeof cls === 'number'
+          ? `Rendered cumulative layout shift: ${cls}.`
+          : 'Rendered layout metric evidence was unavailable.',
+      ],
+      {
+        wire_value:
+          typeof cls === 'number'
+            ? { cumulative_layout_shift: cls }
+            : undefined,
+        metadata: {
+          confidence: typeof cls === 'number' ? 'high' : 'unknown',
+          status: typeof cls === 'number' ? 'implemented' : 'adapter_missing',
+          labels:
+            typeof cls === 'number'
+              ? ['rendered-dom', 'layout-metric']
+              : ['adapter-missing'],
+        },
+      }
     )
   );
   results.push(
@@ -746,6 +825,40 @@ function detectContentSignals(
   )
     signals.add('robots-policy-marker');
   return [...signals].sort();
+}
+
+function analyzeRenderedFields(
+  interactive: Array<{
+    role?: string;
+    name?: string;
+    tagName: string;
+    type?: string;
+    disabled?: boolean;
+  }>
+) {
+  const fields = interactive.filter((element) => {
+    if (element.disabled) return false;
+    if (['input', 'select', 'textarea'].includes(element.tagName)) {
+      return !['hidden', 'submit', 'button', 'reset'].includes(
+        element.type ?? ''
+      );
+    }
+    return [
+      'checkbox',
+      'combobox',
+      'listbox',
+      'radio',
+      'searchbox',
+      'slider',
+      'spinbutton',
+      'switch',
+      'textbox',
+    ].includes(element.role ?? '');
+  });
+  return {
+    total: fields.length,
+    unlabeled: fields.filter((element) => !element.name?.trim()).length,
+  };
 }
 
 function extractToolNames(parsed: ServerCard | undefined): string[] {
