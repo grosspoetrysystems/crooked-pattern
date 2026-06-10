@@ -1,4 +1,4 @@
-import type { Category, CheckResult, Mode, Result } from "./types.js";
+import type { Category, CheckResult, Mode, Result } from './types.js';
 
 export const READINESS_WEIGHTS: Record<Category, number> = {
   crawl_access: 12,
@@ -8,7 +8,7 @@ export const READINESS_WEIGHTS: Record<Category, number> = {
   navigability_stability: 18,
   trust_freshness: 12,
   supply_chain_safety: 0,
-  runtime_agent_safety: 0
+  runtime_agent_safety: 0,
 };
 
 export function check(
@@ -32,7 +32,7 @@ export function check(
     score: clamp(score),
     deterministic: true,
     notes,
-    ...extra
+    ...extra,
   };
 }
 

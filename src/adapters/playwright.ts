@@ -39,10 +39,10 @@ export interface RenderedDomInput {
   adapter?: RenderedDomAdapter;
 }
 
-export async function resolveRenderedDom(
+export function resolveRenderedDom(
   url: string,
   input: RenderedDomInput = {}
-): Promise<RenderedDomSnapshot | undefined> {
+): Promise<RenderedDomSnapshot> | RenderedDomSnapshot | undefined {
   if (input.snapshot) return input.snapshot;
   if (input.adapter) return input.adapter.snapshot(url);
   return undefined;

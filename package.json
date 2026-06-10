@@ -16,8 +16,8 @@
     "dev": "tsx src/bin/cli.ts",
     "scan": "tsx src/bin/cli.ts scan",
     "diff": "tsx src/bin/cli.ts diff",
-    "lint": "ultracite lint",
-    "format": "ultracite format",
+    "lint": "biome check src package.json tsconfig.json tsup.config.ts vitest.config.ts knip.config.ts commitlint.config.js biome.jsonc",
+    "format": "biome check --write src package.json tsconfig.json tsup.config.ts vitest.config.ts knip.config.ts commitlint.config.js biome.jsonc",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "knip": "knip",
@@ -27,6 +27,7 @@
     "commander": "^12.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "1.9.4",
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
     "@types/node": "^22.10.2",

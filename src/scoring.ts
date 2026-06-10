@@ -1,22 +1,33 @@
-import { READINESS_WEIGHTS, clamp } from "./checks.js";
-import type { ArsArtifact, CategoryScore, CheckResult, ScanInput, ScoreSummary } from "./types.js";
+import { READINESS_WEIGHTS, clamp } from './checks.js';
+import type {
+  ArsArtifact,
+  CategoryScore,
+  CheckResult,
+  ScanInput,
+  ScoreSummary,
+} from './types.js';
 
-const readinessCategories = Object.entries(READINESS_WEIGHTS).filter(([, weight]) => weight > 0).map(([category]) => category);
+const readinessCategories = Object.entries(READINESS_WEIGHTS)
+  .filter(([, weight]) => weight > 0)
+  .map(([category]) => category);
 
-export function buildArtifact(input: ScanInput, checks: CheckResult[]): ArsArtifact {
+export function buildArtifact(
+  input: ScanInput,
+  checks: CheckResult[]
+): ArsArtifact {
   const summary = score(checks);
   return {
-    schema_version: "ars.v1",
+    schema_version: 'ars.v1',
     generated_at: new Date().toISOString(),
     input,
     summary,
     checks,
     caveats: [
-      "ARS measures readiness signals, not guaranteed agent task success.",
-      "Automated accessibility and safety checks catch only a fraction of real issues; a perfect score is not proof of safety or readiness.",
-      "llms.txt and WebMCP-style signals are emerging/unproven by major AI providers and are weighted low.",
-      "Unknown checks indicate probes that could not run or evidence that was unavailable; they are not fabricated as failures."
-    ]
+      'ARS measures readiness signals, not guaranteed agent task success.',
+      'Automated accessibility and safety checks catch only a fraction of real issues; a perfect score is not proof of safety or readiness.',
+      'llms.txt and WebMCP-style signals are emerging/unproven by major AI providers and are weighted low.',
+      'Unknown checks indicate probes that could not run or evidence that was unavailable; they are not fabricated as failures.',
+    ],
   };
 }
 
@@ -27,23 +38,35 @@ export function score(checks: CheckResult[]): ScoreSummary {
   for (const category of readinessCategories) {
     const catChecks = checks.filter((check) => check.category === category);
     const avg = weightedAverage(catChecks);
-    const categoryWeight = READINESS_WEIGHTS[category as keyof typeof READINESS_WEIGHTS];
+    const categoryWeight =
+      READINESS_WEIGHTS[category as keyof typeof READINESS_WEIGHTS];
     if (avg === null) {
-      categories[category] = { result: "unassessed" };
+      categories[category] = { result: 'unassessed' };
       continue;
     }
-    categories[category] = { result: "assessed", score: avg };
+    categories[category] = { result: 'assessed', score: avg };
     measuredWeight += categoryWeight;
     weightedReadiness += avg * categoryWeight;
   }
   const readiness = measuredWeight > 0 ? weightedReadiness / measuredWeight : 0;
-  const measuredCategories = Object.values(categories).filter((category) => category.result === "assessed").length;
+  const measuredCategories = Object.values(categories).filter(
+    (category) => category.result === 'assessed'
+  ).length;
 
-  const buildSafety = weightedAverage(checks.filter((check) => check.category === "supply_chain_safety"));
-  const runtimeChecks = checks.filter((check) => check.category === "runtime_agent_safety");
+  const buildSafety = weightedAverage(
+    checks.filter((check) => check.category === 'supply_chain_safety')
+  );
+  const runtimeChecks = checks.filter(
+    (check) => check.category === 'runtime_agent_safety'
+  );
   const runtimeSafety = weightedAverage(runtimeChecks);
-  const insecureExposure = runtimeSafety === null || !hasActualExposure(checks) ? 0 : (100 - runtimeSafety) / 100;
-  const exposureMultiplier = clampDecimal(Math.max(0.55, 1 - insecureExposure * 0.45));
+  const insecureExposure =
+    runtimeSafety === null || !hasActualExposure(checks)
+      ? 0
+      : (100 - runtimeSafety) / 100;
+  const exposureMultiplier = clampDecimal(
+    Math.max(0.55, 1 - insecureExposure * 0.45)
+  );
   const final = readiness * exposureMultiplier;
 
   return {
@@ -56,21 +79,28 @@ export function score(checks: CheckResult[]): ScoreSummary {
     total_categories: readinessCategories.length,
     safety: {
       build_time_supply_chain: buildSafety ?? 0,
-      runtime_agent_interaction: runtimeSafety ?? 0
-    }
+      runtime_agent_interaction: runtimeSafety ?? 0,
+    },
   };
 }
 
 function hasActualExposure(checks: CheckResult[]) {
   return checks.some((check) => {
-    if (check.id === "wire.mcp_server_card") {
-      const value = check.wire_value as { live_tool_count?: number; tools?: string[] } | undefined;
-      return (value?.live_tool_count ?? 0) > 0 || (value?.tools?.length ?? 0) > 0;
+    if (check.id === 'wire.mcp_server_card') {
+      const value = check.wire_value as
+        | { live_tool_count?: number; tools?: string[] }
+        | undefined;
+      return (
+        (value?.live_tool_count ?? 0) > 0 || (value?.tools?.length ?? 0) > 0
+      );
     }
-    if (check.id === "wire.openapi_catalog" || check.id === "wire.oauth_discovery") {
-      return check.result === "pass";
+    if (
+      check.id === 'wire.openapi_catalog' ||
+      check.id === 'wire.oauth_discovery'
+    ) {
+      return check.result === 'pass';
     }
-    if (check.id === "both.mcp_tool_count_agreement") {
+    if (check.id === 'both.mcp_tool_count_agreement') {
       return (check.reconciliation?.wire_tools.length ?? 0) > 0;
     }
     return false;
@@ -78,24 +108,31 @@ function hasActualExposure(checks: CheckResult[]) {
 }
 
 function weightedAverage(checks: CheckResult[]) {
-  const known = checks.filter((check) => check.result !== "unknown");
+  const known = checks.filter((check) => check.result !== 'unknown');
   if (!known.length) return null;
   const totalWeight = known.reduce((sum, check) => sum + check.weight, 0);
   if (!totalWeight) return null;
-  return clamp(known.reduce((sum, check) => sum + check.score * check.weight, 0) / totalWeight);
+  return clamp(
+    known.reduce((sum, check) => sum + check.score * check.weight, 0) /
+      totalWeight
+  );
 }
 
-function tier(categories: Record<string, CategoryScore>): ScoreSummary["tier"] {
-  if (categoryScore(categories.crawl_access) < 60) return "T0 Unassessed";
-  if (categoryScore(categories.content_legibility) < 60) return "T1 Crawlable";
-  if (categoryScore(categories.structured_meaning) < 60) return "T2 Legible";
-  if (categoryScore(categories.agent_operability) < 60) return "T3 Structured";
-  if (categoryScore(categories.navigability_stability) < 60 || categoryScore(categories.trust_freshness) < 60) return "T4 Operable";
-  return "T5 Agent-Native";
+function tier(categories: Record<string, CategoryScore>): ScoreSummary['tier'] {
+  if (categoryScore(categories.crawl_access) < 60) return 'T0 Unassessed';
+  if (categoryScore(categories.content_legibility) < 60) return 'T1 Crawlable';
+  if (categoryScore(categories.structured_meaning) < 60) return 'T2 Legible';
+  if (categoryScore(categories.agent_operability) < 60) return 'T3 Structured';
+  if (
+    categoryScore(categories.navigability_stability) < 60 ||
+    categoryScore(categories.trust_freshness) < 60
+  )
+    return 'T4 Operable';
+  return 'T5 Agent-Native';
 }
 
 function categoryScore(category: CategoryScore | undefined) {
-  return category?.result === "assessed" ? category.score ?? 0 : 0;
+  return category?.result === 'assessed' ? (category.score ?? 0) : 0;
 }
 
 function clampDecimal(value: number) {
