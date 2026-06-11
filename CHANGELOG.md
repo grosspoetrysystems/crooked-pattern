@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add parser-backed HTML and JSON-LD evidence for structured wire checks.
 - Add a central rubric registry for check metadata, evidence labels, weights, and maturity gate membership.
 - Add optional rendered DOM wire evidence for browser-observed text, accessibility summaries, field labels, and layout shift metrics.
 - Fix Biome/Ultracite linting to use a local Biome dependency instead of `npx`, removing npm config warnings from the verify gate.

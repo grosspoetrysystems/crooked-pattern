@@ -3,6 +3,14 @@ import {
   resolveRenderedDom,
 } from './adapters/playwright.js';
 import { check } from './checks.js';
+import {
+  attrValue,
+  hasAttr,
+  jsonLdScriptCount,
+  parseHtmlEvidence,
+  parsedJsonLdBlocks,
+  tagsNamed,
+} from './html.js';
 import type { CheckResult } from './types.js';
 
 interface Fetched {
@@ -26,6 +34,7 @@ export async function runWirePass(
   const results: CheckResult[] = [];
   const page = await fetchText(url);
   const html = page?.text ?? '';
+  const parsedHtml = parseHtmlEvidence(html);
   const rendered = await resolveRenderedDom(url, renderedDom);
   const origin = new URL(url).origin;
 
@@ -149,7 +158,7 @@ export async function runWirePass(
 
   const renderedText = rendered?.text.trim();
   const visibleTextSource = renderedText ? 'rendered' : 'fetch';
-  const textLen = (renderedText ?? visibleText(html)).length;
+  const textLen = (renderedText ?? parsedHtml.visibleText).length;
   const hasTextEvidence = Boolean(renderedText || page);
   results.push(
     check(
@@ -216,7 +225,7 @@ export async function runWirePass(
       [`Initial HTML byte size: ${pageWeight}.`]
     )
   );
-  const cleanDom = (html.match(/<script\b/gi)?.length ?? 0) < 20;
+  const cleanDom = tagsNamed(parsedHtml, 'script').length < 20;
   results.push(
     check(
       'wire.clean_dom',
@@ -234,11 +243,8 @@ export async function runWirePass(
     )
   );
 
-  const jsonLd = [
-    ...html.matchAll(
-      /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
-    ),
-  ].map((m) => m[1]);
+  const jsonLdCount = jsonLdScriptCount(parsedHtml);
+  const validJsonLd = parsedJsonLdBlocks(parsedHtml);
   results.push(
     check(
       'wire.json_ld',
@@ -246,22 +252,28 @@ export async function runWirePass(
       'structured_meaning',
       'WIRE_ONLY',
       6,
-      jsonLd.length && jsonLd.every(canParseJson)
+      jsonLdCount > 0 && jsonLdCount === validJsonLd.length
         ? 'pass'
-        : jsonLd.length
+        : jsonLdCount > 0
           ? 'partial'
           : 'fail',
-      jsonLd.length && jsonLd.every(canParseJson)
+      jsonLdCount > 0 && jsonLdCount === validJsonLd.length
         ? 100
-        : jsonLd.length
+        : jsonLdCount > 0
           ? 50
           : 0,
       [
-        jsonLd.length
-          ? `Found ${jsonLd.length} JSON-LD block(s).`
+        jsonLdCount
+          ? `Found ${jsonLdCount} JSON-LD block(s); ${validJsonLd.length} parsed successfully.`
           : 'No JSON-LD found.',
-      ]
+      ],
+      {
+        wire_value: { blocks: jsonLdCount, valid_blocks: validJsonLd.length },
+      }
     )
+  );
+  const openGraphTags = parsedHtml.tags.filter((tag) =>
+    attrValue(tag.attrs, 'property')?.toLowerCase().startsWith('og:')
   );
   results.push(
     check(
@@ -270,16 +282,17 @@ export async function runWirePass(
       'structured_meaning',
       'WIRE_ONLY',
       3,
-      /property=["']og:/i.test(html) ? 'pass' : 'fail',
-      /property=["']og:/i.test(html) ? 100 : 0,
+      openGraphTags.length > 0 ? 'pass' : 'fail',
+      openGraphTags.length > 0 ? 100 : 0,
       [
-        /property=["']og:/i.test(html)
-          ? 'Open Graph tags found.'
+        openGraphTags.length > 0
+          ? `Open Graph tags found: ${openGraphTags.length}.`
           : 'No Open Graph tags found.',
-      ]
+      ],
+      { wire_value: { tags: openGraphTags.length } }
     )
   );
-  const h1Count = html.match(/<h1\b/gi)?.length ?? 0;
+  const h1Count = tagsNamed(parsedHtml, 'h1').length;
   results.push(
     check(
       'wire.single_h1',
@@ -292,7 +305,17 @@ export async function runWirePass(
       [`h1 count: ${h1Count}.`]
     )
   );
-  const landmarks = /<(main|nav|header|footer|article|section)\b/i.test(html);
+  const semanticLandmarkTags = new Set([
+    'main',
+    'nav',
+    'header',
+    'footer',
+    'article',
+    'section',
+  ]);
+  const landmarkCount = parsedHtml.tags.filter((tag) =>
+    semanticLandmarkTags.has(tag.name)
+  ).length;
   results.push(
     check(
       'wire.semantic_landmarks',
@@ -300,13 +323,14 @@ export async function runWirePass(
       'structured_meaning',
       'WIRE_ONLY',
       5,
-      landmarks ? 'pass' : 'fail',
-      landmarks ? 100 : 0,
+      landmarkCount > 0 ? 'pass' : 'fail',
+      landmarkCount > 0 ? 100 : 0,
       [
-        landmarks
-          ? 'Semantic landmarks found.'
+        landmarkCount > 0
+          ? `Semantic landmarks found: ${landmarkCount}.`
           : 'No common semantic landmarks found.',
-      ]
+      ],
+      { wire_value: { landmarks: landmarkCount } }
     )
   );
 
@@ -393,8 +417,8 @@ export async function runWirePass(
     )
   );
 
-  const images = html.match(/<img\b[^>]*>/gi) ?? [];
-  const missingAlt = images.filter((tag) => !/\salt=/.test(tag)).length;
+  const images = tagsNamed(parsedHtml, 'img');
+  const missingAlt = images.filter((tag) => !hasAttr(tag.attrs, 'alt')).length;
   results.push(
     check(
       'wire.alt_attributes',
@@ -404,15 +428,19 @@ export async function runWirePass(
       4,
       missingAlt === 0 ? 'pass' : 'partial',
       missingAlt === 0 ? 100 : 50,
-      [`Images: ${images.length}; missing alt: ${missingAlt}.`]
+      [`Images: ${images.length}; missing alt: ${missingAlt}.`],
+      { wire_value: { images: images.length, missing_alt: missingAlt } }
     )
   );
   const renderedFields = rendered
     ? analyzeRenderedFields(rendered.interactive)
     : undefined;
-  const inputs = html.match(/<input\b[^>]*>/gi) ?? [];
+  const inputs = tagsNamed(parsedHtml, 'input');
   const staticUnlabeled = inputs.filter(
-    (tag) => !/\b(aria-label|aria-labelledby|id)=/i.test(tag)
+    (tag) =>
+      !hasAttr(tag.attrs, 'aria-label') &&
+      !hasAttr(tag.attrs, 'aria-labelledby') &&
+      !hasAttr(tag.attrs, 'id')
   ).length;
   const fieldTotal = renderedFields?.total ?? inputs.length;
   const unlabeled = renderedFields?.unlabeled ?? staticUnlabeled;
@@ -480,8 +508,9 @@ export async function runWirePass(
       }
     )
   );
-  const badLinks = (html.match(/<a\b[^>]*>(click here|here|more)<\/a>/gi) ?? [])
-    .length;
+  const badLinks = parsedHtml.anchors.filter((anchor) =>
+    ['click here', 'here', 'more'].includes(anchor.text.toLowerCase())
+  ).length;
   results.push(
     check(
       'wire.descriptive_links',
@@ -491,7 +520,8 @@ export async function runWirePass(
       4,
       badLinks === 0 ? 'pass' : 'partial',
       badLinks === 0 ? 100 : 50,
-      [`Non-descriptive link labels: ${badLinks}.`]
+      [`Non-descriptive link labels: ${badLinks}.`],
+      { wire_value: { non_descriptive_links: badLinks } }
     )
   );
   const cls = rendered?.metrics?.cumulativeLayoutShift;
@@ -538,10 +568,10 @@ export async function runWirePass(
       'navigability_stability',
       'WIRE_ONLY',
       2,
-      /\baria-/.test(html) ? 'pass' : 'partial',
-      /\baria-/.test(html) ? 100 : 50,
+      hasAriaAttributes(parsedHtml) ? 'pass' : 'partial',
+      hasAriaAttributes(parsedHtml) ? 100 : 50,
       [
-        /\baria-/.test(html)
+        hasAriaAttributes(parsedHtml)
           ? 'ARIA attributes present; full resolution requires axe-core adapter.'
           : 'No ARIA attributes found; full axe-core adapter not installed.',
       ]
@@ -571,18 +601,16 @@ export async function runWirePass(
       'trust_freshness',
       'WIRE_ONLY',
       2,
-      /rel=["']canonical["']/i.test(html) ? 'pass' : 'fail',
-      /rel=["']canonical["']/i.test(html) ? 100 : 0,
+      hasLinkRel(parsedHtml, 'canonical') ? 'pass' : 'fail',
+      hasLinkRel(parsedHtml, 'canonical') ? 100 : 0,
       [
-        /rel=["']canonical["']/i.test(html)
+        hasLinkRel(parsedHtml, 'canonical')
           ? 'Canonical link found.'
           : 'No canonical link found.',
       ]
     )
   );
-  const freshness = /datePublished|dateModified|last updated|updated/i.test(
-    html
-  );
+  const freshness = hasFreshnessSignal(parsedHtml);
   results.push(
     check(
       'wire.last_updated',
@@ -599,10 +627,7 @@ export async function runWirePass(
       ]
     )
   );
-  const citations =
-    /<cite\b|href=["'][^"']*(doi\.org|pubmed|arxiv|wikipedia|\.gov|\.edu)/i.test(
-      html
-    );
+  const citations = hasCitationSignal(parsedHtml);
   results.push(
     check(
       'wire.citations',
@@ -619,10 +644,7 @@ export async function runWirePass(
       ]
     )
   );
-  const author =
-    /"@(type)"\s*:\s*"Person"|rel=["']author["']|name=["']author["']/i.test(
-      html
-    );
+  const author = hasAuthorSignal(parsedHtml);
   results.push(
     check(
       'wire.author',
@@ -769,25 +791,64 @@ async function firstFetch(urls: string[]) {
   return undefined;
 }
 
-function visibleText(html: string) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function canParseJson(text: string) {
-  return Boolean(safeJson(text));
-}
-
 function safeJson<T>(text: string): T | undefined {
   try {
     return JSON.parse(text) as T;
   } catch {
     return undefined;
   }
+}
+
+function hasAriaAttributes(parsed: ReturnType<typeof parseHtmlEvidence>) {
+  return parsed.tags.some((tag) =>
+    Object.keys(tag.attrs).some((name) => name.startsWith('aria-'))
+  );
+}
+
+function hasLinkRel(parsed: ReturnType<typeof parseHtmlEvidence>, rel: string) {
+  return parsed.tags.some(
+    (tag) =>
+      tag.name === 'link' &&
+      attrValue(tag.attrs, 'rel')
+        ?.split(/\s+/)
+        .some((value) => value.toLowerCase() === rel)
+  );
+}
+
+function hasFreshnessSignal(parsed: ReturnType<typeof parseHtmlEvidence>) {
+  const jsonLdText = JSON.stringify(parsedJsonLdBlocks(parsed));
+  return (
+    /datePublished|dateModified/i.test(jsonLdText) ||
+    /last updated|updated/i.test(parsed.visibleText)
+  );
+}
+
+function hasCitationSignal(parsed: ReturnType<typeof parseHtmlEvidence>) {
+  return parsed.tags.some((tag) => {
+    if (tag.name === 'cite') return true;
+    const href = attrValue(tag.attrs, 'href');
+    return Boolean(
+      href && /doi\.org|pubmed|arxiv|wikipedia|\.gov|\.edu/i.test(href)
+    );
+  });
+}
+
+function hasAuthorSignal(parsed: ReturnType<typeof parseHtmlEvidence>) {
+  return (
+    parsedJsonLdBlocks(parsed).some(hasPersonType) ||
+    parsed.tags.some((tag) => {
+      if (attrValue(tag.attrs, 'rel')?.toLowerCase() === 'author') return true;
+      return attrValue(tag.attrs, 'name')?.toLowerCase() === 'author';
+    })
+  );
+}
+
+function hasPersonType(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasPersonType);
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (record['@type'] === 'Person') return true;
+  return Object.values(record).some(hasPersonType);
 }
 
 function parseLlmsTxt(text: string) {

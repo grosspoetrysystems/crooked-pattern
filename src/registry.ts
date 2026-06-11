@@ -27,6 +27,11 @@ const adapterMissing = metadata('unknown', 'adapter_missing', [
   'adapter-missing',
 ]);
 const emerging = metadata('high', 'implemented', ['emerging', 'low-weight']);
+const parsedHtml = metadata('high', 'implemented', ['parsed-html']);
+const parsedJsonLd = metadata('high', 'implemented', [
+  'parsed-html',
+  'json-ld',
+]);
 
 export const CHECK_REGISTRY = defineRegistry([
   definition(
@@ -202,7 +207,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     6,
     ['T3 Structured'],
-    high
+    parsedJsonLd
   ),
   definition(
     'wire.open_graph',
@@ -211,7 +216,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     3,
     ['T3 Structured'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.single_h1',
@@ -220,7 +225,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     4,
     ['T3 Structured'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.semantic_landmarks',
@@ -229,7 +234,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     5,
     ['T3 Structured'],
-    high
+    parsedHtml
   ),
 
   definition(
@@ -285,7 +290,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     4,
     ['T5 Agent-Native'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.labeled_fields',
@@ -314,7 +319,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     4,
     ['T5 Agent-Native'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.cls_probe',
@@ -352,7 +357,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     2,
     ['T5 Agent-Native'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.last_updated',
@@ -361,7 +366,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     3,
     ['T5 Agent-Native'],
-    high
+    parsedJsonLd
   ),
   definition(
     'wire.citations',
@@ -370,7 +375,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     2,
     ['T5 Agent-Native'],
-    high
+    parsedHtml
   ),
   definition(
     'wire.author',
@@ -379,7 +384,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     2,
     ['T5 Agent-Native'],
-    high
+    parsedJsonLd
   ),
 
   definition(
