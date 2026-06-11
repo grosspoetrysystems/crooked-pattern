@@ -1,3 +1,4 @@
+import { check } from './checks.js';
 import type { CheckResult } from './types.js';
 
 interface ToolEvidence {
@@ -19,30 +20,33 @@ export function reconcileChecks(checks: CheckResult[]) {
   );
 
   if (authored.length === 0 && live.length === 0) {
-    checks.push({
-      id: 'both.mcp_tool_count_agreement',
-      title: 'authored vs live MCP tool agreement',
-      category: 'runtime_agent_safety',
-      mode: 'BOTH',
-      weight: 15,
-      result: 'unknown',
-      score: 0,
-      deterministic: true,
-      notes: [
-        'No authored or live MCP/WebMCP tools detected; no reconciliation comparison was possible.',
-      ],
-      source_value: { tool_count: 0, tools: [] },
-      wire_value: { tool_count: 0, tools: [] },
-      agreement_state: 'unknown',
-      reconciliation: {
-        source_tools: [],
-        wire_tools: [],
-        delta: 0,
-        undocumented_tools: [],
-        missing_live_tools: [],
-        severity: 'none',
-      },
-    });
+    checks.push(
+      check(
+        'both.mcp_tool_count_agreement',
+        'authored vs live MCP tool agreement',
+        'runtime_agent_safety',
+        'BOTH',
+        15,
+        'unknown',
+        0,
+        [
+          'No authored or live MCP/WebMCP tools detected; no reconciliation comparison was possible.',
+        ],
+        {
+          source_value: { tool_count: 0, tools: [] },
+          wire_value: { tool_count: 0, tools: [] },
+          agreement_state: 'unknown',
+          reconciliation: {
+            source_tools: [],
+            wire_tools: [],
+            delta: 0,
+            undocumented_tools: [],
+            missing_live_tools: [],
+            severity: 'none',
+          },
+        }
+      )
+    );
     return;
   }
 
@@ -55,32 +59,35 @@ export function reconcileChecks(checks: CheckResult[]) {
     delta === 0 && undocumented.length === 0 && missingLive.length === 0;
   const sev = severity(Math.max(undocumented.length, Math.abs(delta)));
 
-  checks.push({
-    id: 'both.mcp_tool_count_agreement',
-    title: 'authored vs live MCP tool agreement',
-    category: 'runtime_agent_safety',
-    mode: 'BOTH',
-    weight: 15,
-    result: agrees ? 'pass' : 'fail',
-    score: agrees ? 100 : scoreForSeverity(sev),
-    deterministic: true,
-    notes: [
-      agrees
-        ? `Authored and live tools match exactly (${authored.length}).`
-        : `Authored tools: ${authored.length}; live tools: ${live.length}; delta: ${delta}; undocumented live tools: ${undocumented.length}.`,
-    ],
-    source_value: { tool_count: authored.length, tools: authored },
-    wire_value: { tool_count: live.length, tools: live },
-    agreement_state: agrees ? 'agree' : 'disagree',
-    reconciliation: {
-      source_tools: authored,
-      wire_tools: live,
-      delta,
-      undocumented_tools: undocumented,
-      missing_live_tools: missingLive,
-      severity: sev,
-    },
-  });
+  checks.push(
+    check(
+      'both.mcp_tool_count_agreement',
+      'authored vs live MCP tool agreement',
+      'runtime_agent_safety',
+      'BOTH',
+      15,
+      agrees ? 'pass' : 'fail',
+      agrees ? 100 : scoreForSeverity(sev),
+      [
+        agrees
+          ? `Authored and live tools match exactly (${authored.length}).`
+          : `Authored tools: ${authored.length}; live tools: ${live.length}; delta: ${delta}; undocumented live tools: ${undocumented.length}.`,
+      ],
+      {
+        source_value: { tool_count: authored.length, tools: authored },
+        wire_value: { tool_count: live.length, tools: live },
+        agreement_state: agrees ? 'agree' : 'disagree',
+        reconciliation: {
+          source_tools: authored,
+          wire_tools: live,
+          delta,
+          undocumented_tools: undocumented,
+          missing_live_tools: missingLive,
+          severity: sev,
+        },
+      }
+    )
+  );
 }
 
 function uniqueTools(tools: string[] | undefined) {

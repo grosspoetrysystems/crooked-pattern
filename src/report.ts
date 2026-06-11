@@ -85,6 +85,8 @@ function formatMetadata(check: CheckResult) {
   if (check.metadata?.status) parts.push(`status=${check.metadata.status}`);
   if (check.metadata?.labels?.length)
     parts.push(`labels=${check.metadata.labels.join(',')}`);
+  if (check.metadata?.maturity_gates?.length)
+    parts.push(`gates=${check.metadata.maturity_gates.join(',')}`);
   return parts.join('; ');
 }
 

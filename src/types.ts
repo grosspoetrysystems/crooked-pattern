@@ -1,5 +1,17 @@
 export type Mode = 'SOURCE_ONLY' | 'WIRE_ONLY' | 'BOTH';
 export type Result = 'pass' | 'fail' | 'partial' | 'unknown';
+export type Confidence = 'high' | 'heuristic' | 'unknown';
+export type ImplementationStatus =
+  | 'implemented'
+  | 'partial'
+  | 'adapter_missing';
+export type MaturityGate =
+  | 'T1 Crawlable'
+  | 'T2 Legible'
+  | 'T3 Structured'
+  | 'T4 Operable'
+  | 'T5 Agent-Native'
+  | 'Safety Modifier';
 export type Category =
   | 'crawl_access'
   | 'content_legibility'
@@ -20,9 +32,10 @@ export interface CheckResult {
   score: number;
   deterministic: boolean;
   metadata?: {
-    confidence?: 'high' | 'heuristic' | 'unknown';
-    status?: 'implemented' | 'partial' | 'adapter_missing';
+    confidence?: Confidence;
+    status?: ImplementationStatus;
     labels?: string[];
+    maturity_gates?: MaturityGate[];
   };
   notes: string[];
   source_value?: unknown;
