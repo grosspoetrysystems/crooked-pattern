@@ -9,6 +9,7 @@ import { markdownReport } from '../report.js';
 import { buildArtifact } from '../scoring.js';
 import { runSourcePass } from '../source.js';
 import type { CheckResult } from '../types.js';
+import { assertArsArtifact } from '../validation.js';
 import { runWirePass } from '../wire.js';
 
 const program = new Command();
@@ -51,6 +52,7 @@ program
         { source: opts.source, url: opts.url },
         checks
       );
+      assertArsArtifact(artifact, 'generated ARS artifact');
       await mkdir(opts.out, { recursive: true });
       await writeFile(
         path.join(opts.out, 'ars.json'),

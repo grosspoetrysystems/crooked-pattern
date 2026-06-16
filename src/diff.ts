@@ -1,9 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import type { ArsArtifact } from './types.js';
+import { readArsArtifact } from './validation.js';
 
 export async function diffArtifacts(beforePath: string, afterPath: string) {
-  const before = JSON.parse(await readFile(beforePath, 'utf8')) as ArsArtifact;
-  const after = JSON.parse(await readFile(afterPath, 'utf8')) as ArsArtifact;
+  const before = await readArsArtifact(beforePath);
+  const after = await readArsArtifact(afterPath);
   const lines = [
     '# ARS Diff',
     '',

@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ArsArtifact } from '../types.js';
+import { validateArsArtifact } from '../validation.js';
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '../..');
@@ -43,6 +44,7 @@ describe('CLI integration pipeline', () => {
 
     const artifact = await readArtifact(outDir);
     expect(artifact.schema_version).toBe('ars.v1');
+    expect(validateArsArtifact(artifact)).toEqual([]);
     expect(artifact.summary.measured_categories).toBeLessThan(
       artifact.summary.total_categories
     );
@@ -97,6 +99,22 @@ describe('CLI integration pipeline', () => {
     expect(diff.stdout).toContain('Exposure multiplier:');
     expect(diff.stdout).toContain('wire.rule_of_two');
   });
+
+  it('rejects malformed diff input artifacts', async () => {
+    await execFileAsync('pnpm', ['build'], { cwd: root });
+    const validPath = path.join(outRoot, 'secure/ars.json');
+    const invalidPath = path.join(outRoot, 'invalid-ars.json');
+    const artifact = await readArtifact(path.dirname(validPath));
+    await writeFile(
+      invalidPath,
+      `${JSON.stringify({ ...artifact, schema_version: 'ars.v2' }, null, 2)}\n`
+    );
+
+    const result = await runCliAllowFailure(['diff', validPath, invalidPath]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('schema_version must be "ars.v1"');
+  });
 });
 
 function runCli(args: string[]) {
@@ -104,6 +122,20 @@ function runCli(args: string[]) {
     cwd: root,
     maxBuffer: 1024 * 1024 * 10,
   });
+}
+
+async function runCliAllowFailure(args: string[]) {
+  try {
+    const result = await runCli(args);
+    return { ...result, code: 0 };
+  } catch (error) {
+    const failed = error as { code?: number; stdout?: string; stderr?: string };
+    return {
+      code: failed.code ?? 1,
+      stdout: failed.stdout ?? '',
+      stderr: failed.stderr ?? '',
+    };
+  }
 }
 
 async function readArtifact(outDir: string) {

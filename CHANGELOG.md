@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Validate generated ARS artifacts and `ars diff` inputs before writing or comparing JSON.
 - Add parser-backed HTML and JSON-LD evidence for structured wire checks.
 - Add a central rubric registry for check metadata, evidence labels, weights, and maturity gate membership.
 - Add optional rendered DOM wire evidence for browser-observed text, accessibility summaries, field labels, and layout shift metrics.
