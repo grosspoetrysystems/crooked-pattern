@@ -1,4 +1,5 @@
 import { READINESS_WEIGHTS, clamp } from './checks.js';
+import { evaluateGates, tierFromGates } from './gates.js';
 import type {
   ArsArtifact,
   CategoryScore,
@@ -27,6 +28,7 @@ export function buildArtifact(
       'Automated accessibility and safety checks catch only a fraction of real issues; a perfect score is not proof of safety or readiness.',
       'llms.txt and WebMCP-style signals are emerging/unproven by major AI providers and are weighted low.',
       'Unknown checks indicate probes that could not run or evidence that was unavailable; they are not fabricated as failures.',
+      'Maturity tiers are unlocked by explicit gate requirements, not category-score bands; a gate whose evidence is unmeasured is reported as unknown, never as pass or fail.',
     ],
   };
 }
@@ -68,12 +70,14 @@ export function score(checks: CheckResult[]): ScoreSummary {
     Math.max(0.55, 1 - insecureExposure * 0.45)
   );
   const final = readiness * exposureMultiplier;
+  const gates = evaluateGates(checks);
 
   return {
     ars_readiness: clamp(readiness),
     ars_final: clamp(final),
     exposure_multiplier: exposureMultiplier,
-    tier: tier(categories),
+    tier: tierFromGates(gates),
+    gates,
     categories,
     measured_categories: measuredCategories,
     total_categories: readinessCategories.length,
@@ -116,23 +120,6 @@ function weightedAverage(checks: CheckResult[]) {
     known.reduce((sum, check) => sum + check.score * check.weight, 0) /
       totalWeight
   );
-}
-
-function tier(categories: Record<string, CategoryScore>): ScoreSummary['tier'] {
-  if (categoryScore(categories.crawl_access) < 60) return 'T0 Unassessed';
-  if (categoryScore(categories.content_legibility) < 60) return 'T1 Crawlable';
-  if (categoryScore(categories.structured_meaning) < 60) return 'T2 Legible';
-  if (categoryScore(categories.agent_operability) < 60) return 'T3 Structured';
-  if (
-    categoryScore(categories.navigability_stability) < 60 ||
-    categoryScore(categories.trust_freshness) < 60
-  )
-    return 'T4 Operable';
-  return 'T5 Agent-Native';
-}
-
-function categoryScore(category: CategoryScore | undefined) {
-  return category?.result === 'assessed' ? (category.score ?? 0) : 0;
 }
 
 function clampDecimal(value: number) {

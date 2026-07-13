@@ -82,6 +82,79 @@ describe('ARS artifact validation', () => {
     );
   });
 
+  it('accepts artifacts without summary.gates for backward compatibility', async () => {
+    const artifact = validArtifact();
+    const legacy = {
+      ...artifact,
+      summary: { ...artifact.summary, gates: undefined },
+    };
+
+    expect(validateArsArtifact(legacy)).toEqual([]);
+
+    const beforePath = path.join(tempDir, 'legacy.json');
+    const afterPath = path.join(tempDir, 'current.json');
+    await writeArtifact(beforePath, legacy);
+    await writeArtifact(afterPath, validArtifact());
+    await expect(diffArtifacts(beforePath, afterPath)).resolves.toContain(
+      '# ARS Diff'
+    );
+  });
+
+  it('rejects malformed gate outcomes and non-tier gates', () => {
+    const base = validArtifact();
+    const gates = base.summary.gates ?? [];
+    const artifact = {
+      ...base,
+      summary: {
+        ...base.summary,
+        gates: [
+          { ...gates[0], outcome: 'maybe' },
+          { ...gates[1], gate: 'Safety Modifier' },
+          ...gates.slice(2),
+        ],
+      },
+    };
+
+    expect(validateArsArtifact(artifact)).toEqual(
+      expect.arrayContaining([
+        'summary.gates[0].outcome has unsupported value "maybe"',
+        'summary.gates[1].gate has unsupported value "Safety Modifier"',
+      ])
+    );
+  });
+
+  it('rejects gate lists that are missing gates or out of order', () => {
+    const base = validArtifact();
+    const gates = base.summary.gates ?? [];
+    const artifact = {
+      ...base,
+      summary: {
+        ...base.summary,
+        gates: [...gates.slice(1), gates[0]],
+      },
+    };
+
+    expect(validateArsArtifact(artifact)).toEqual(
+      expect.arrayContaining([
+        'summary.gates must list gates T1 Crawlable, T2 Legible, T3 Structured, T4 Operable, T5 Agent-Native in order',
+      ])
+    );
+  });
+
+  it('rejects a tier that disagrees with recorded gate outcomes', () => {
+    const base = validArtifact();
+    const artifact = {
+      ...base,
+      summary: { ...base.summary, tier: 'T5 Agent-Native' },
+    };
+
+    expect(validateArsArtifact(artifact)).toEqual(
+      expect.arrayContaining([
+        'summary.tier must match the highest consecutive passed gate (expected "T0 Unassessed")',
+      ])
+    );
+  });
+
   it('labels malformed JSON artifacts before diff code can consume them', async () => {
     const filePath = path.join(tempDir, 'ars.json');
     await writeFile(filePath, '{"schema_version":');

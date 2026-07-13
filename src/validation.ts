@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import type { ArsArtifact } from './types.js';
+import { tierFromGates } from './gates.js';
+import type { ArsArtifact, MaturityGateOutcome } from './types.js';
 
 const categories = new Set([
   'crawl_access',
@@ -32,6 +33,15 @@ const tiers = new Set([
   'T4 Operable',
   'T5 Agent-Native',
 ]);
+const tierGateOrder = [
+  'T1 Crawlable',
+  'T2 Legible',
+  'T3 Structured',
+  'T4 Operable',
+  'T5 Agent-Native',
+];
+const gateOutcomes = new Set(['pass', 'fail', 'unknown']);
+const requirementKinds = new Set(['any_pass', 'no_known_fail']);
 const agreementStates = new Set([
   'agree',
   'disagree',
@@ -113,6 +123,10 @@ function validateSummary(value: unknown, path: string, issues: string[]) {
     issues
   );
   requireOneOf(value.tier, tiers, `${path}.tier`, issues);
+  // Absent gates stay valid so artifacts generated before gate outcomes
+  // existed keep validating and diffing.
+  if ('gates' in value && value.gates !== undefined)
+    validateGates(value.gates, value.tier, `${path}.gates`, issues);
   validateCategoryScores(value.categories, `${path}.categories`, issues);
   requireNonNegativeInteger(
     value.measured_categories,
@@ -125,6 +139,88 @@ function validateSummary(value: unknown, path: string, issues: string[]) {
     issues
   );
   validateSafety(value.safety, `${path}.safety`, issues);
+}
+
+function validateGates(
+  value: unknown,
+  tier: unknown,
+  path: string,
+  issues: string[]
+) {
+  if (!Array.isArray(value)) {
+    issues.push(`${path} must be an array`);
+    return;
+  }
+  const before = issues.length;
+  const listedGates = value.map((gate, index) =>
+    validateGate(gate, `${path}[${index}]`, issues)
+  );
+  if (
+    listedGates.length !== tierGateOrder.length ||
+    tierGateOrder.some((gate, index) => listedGates[index] !== gate)
+  )
+    issues.push(`${path} must list gates ${tierGateOrder.join(', ')} in order`);
+  const structurallyValid = issues.length === before;
+  if (structurallyValid && isString(tier) && tiers.has(tier)) {
+    const derived = tierFromGates(
+      value as Pick<MaturityGateOutcome, 'gate' | 'outcome'>[]
+    );
+    if (tier !== derived)
+      issues.push(
+        `summary.tier must match the highest consecutive passed gate (expected ${JSON.stringify(derived)})`
+      );
+  }
+}
+
+function validateGate(
+  value: unknown,
+  path: string,
+  issues: string[]
+): string | undefined {
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return undefined;
+  }
+  if (!isString(value.gate) || !tierGateOrder.includes(value.gate))
+    issues.push(
+      `${path}.gate has unsupported value ${JSON.stringify(value.gate)}`
+    );
+  requireOneOf(value.outcome, gateOutcomes, `${path}.outcome`, issues);
+  if (Array.isArray(value.requirements)) {
+    for (const [index, requirement] of value.requirements.entries())
+      validateGateRequirement(
+        requirement,
+        `${path}.requirements[${index}]`,
+        issues
+      );
+  } else {
+    issues.push(`${path}.requirements must be an array`);
+  }
+  return isString(value.gate) ? value.gate : undefined;
+}
+
+function validateGateRequirement(
+  value: unknown,
+  path: string,
+  issues: string[]
+) {
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return;
+  }
+  requireString(value.id, `${path}.id`, issues);
+  requireString(value.description, `${path}.description`, issues);
+  requireOneOf(value.kind, requirementKinds, `${path}.kind`, issues);
+  validateStringArray(value.check_ids, `${path}.check_ids`, issues);
+  requireOneOf(value.outcome, gateOutcomes, `${path}.outcome`, issues);
+  if ('satisfied_by' in value && value.satisfied_by !== undefined)
+    requireString(value.satisfied_by, `${path}.satisfied_by`, issues);
+  if ('unknown_check_ids' in value && value.unknown_check_ids !== undefined)
+    validateStringArray(
+      value.unknown_check_ids,
+      `${path}.unknown_check_ids`,
+      issues
+    );
 }
 
 function validateCategoryScores(

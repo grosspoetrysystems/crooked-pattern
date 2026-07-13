@@ -3,47 +3,28 @@ import { check } from '../checks.js';
 import { buildArtifact, score } from '../scoring.js';
 import type { CheckResult } from '../types.js';
 
+// Registry-backed IDs so category coverage and gate requirements are both
+// exercised: every readiness category is measured and every T1-T5 gate has a
+// satisfiable member when value passes.
+const readinessCheckIds = [
+  'wire.robots',
+  'wire.initial_html_content',
+  'wire.clean_dom',
+  'wire.json_ld',
+  'wire.single_h1',
+  'wire.semantic_landmarks',
+  'wire.agents_md',
+  'wire.alt_attributes',
+  'wire.labeled_fields',
+  'wire.descriptive_links',
+  'wire.https',
+  'wire.last_updated',
+];
+
 function readinessChecks(value: number): CheckResult[] {
-  return [
-    check('crawl', 'crawl', 'crawl_access', 'WIRE_ONLY', 1, 'pass', value),
-    check(
-      'content',
-      'content',
-      'content_legibility',
-      'WIRE_ONLY',
-      1,
-      'pass',
-      value
-    ),
-    check(
-      'structured',
-      'structured',
-      'structured_meaning',
-      'WIRE_ONLY',
-      1,
-      'pass',
-      value
-    ),
-    check(
-      'operable',
-      'operable',
-      'agent_operability',
-      'WIRE_ONLY',
-      1,
-      'pass',
-      value
-    ),
-    check(
-      'nav',
-      'nav',
-      'navigability_stability',
-      'WIRE_ONLY',
-      1,
-      'pass',
-      value
-    ),
-    check('trust', 'trust', 'trust_freshness', 'WIRE_ONLY', 1, 'pass', value),
-  ];
+  return readinessCheckIds.map((id) =>
+    check(id, id, 'crawl_access', 'WIRE_ONLY', 1, 'pass', value)
+  );
 }
 
 describe('score', () => {
@@ -65,8 +46,22 @@ describe('score', () => {
     expect(summary.ars_final).toBe(100);
     expect(summary.exposure_multiplier).toBe(1);
     expect(summary.tier).toBe('T5 Agent-Native');
+    expect(summary.gates).toHaveLength(5);
+    expect(summary.gates?.every((gate) => gate.outcome === 'pass')).toBe(true);
     expect(summary.measured_categories).toBe(6);
     expect(summary.total_categories).toBe(6);
+  });
+
+  it('reports T0 with unknown gates when no gate-member checks are present', () => {
+    const summary = score([
+      check('crawl', 'crawl', 'crawl_access', 'WIRE_ONLY', 1, 'pass', 100),
+    ]);
+
+    expect(summary.tier).toBe('T0 Unassessed');
+    expect(summary.gates).toHaveLength(5);
+    expect(summary.gates?.every((gate) => gate.outcome === 'unknown')).toBe(
+      true
+    );
   });
 
   it('caps insecure exposure with the multiplier while preserving readiness', () => {

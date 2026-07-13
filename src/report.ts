@@ -1,4 +1,9 @@
-import type { ArsArtifact, CheckResult } from './types.js';
+import type {
+  ArsArtifact,
+  CheckResult,
+  GateRequirementOutcome,
+  MaturityGateOutcome,
+} from './types.js';
 
 export function markdownReport(artifact: ArsArtifact) {
   const s = artifact.summary;
@@ -18,16 +23,26 @@ export function markdownReport(artifact: ArsArtifact) {
     `- ARS final: **${s.ars_final}/100**`,
     `- ARS readiness: **${s.ars_readiness}/100** (${s.measured_categories} of ${s.total_categories} categories measured)`,
     `- Exposure multiplier: **${s.exposure_multiplier}**`,
-    `- Maturity tier: **${s.tier}**`,
+    `- Maturity tier: **${s.tier}** (highest consecutive gate passed)`,
     `- Build-time supply-chain safety: **${s.safety.build_time_supply_chain}/100**`,
     `- Runtime agent-interaction safety: **${s.safety.runtime_agent_interaction}/100**`,
     '',
     '## Category Scores',
     '',
+    'Category scores are descriptive aggregates feeding the ARS numbers; they no longer determine the maturity tier.',
+    '',
     ...Object.entries(s.categories).map(
       ([name, value]) =>
         `- ${label(name)}: ${value.result === 'assessed' ? `${value.score}/100` : 'unassessed'}`
     ),
+    '',
+    '## Maturity Gates',
+    '',
+    'Tiers are unlocked by explicit gate requirements traceable to registry check IDs. Unmeasured evidence reports as unknown, never pass or fail.',
+    '',
+    s.gates?.length
+      ? gateTable(s.gates)
+      : 'Gate outcomes were not recorded in this artifact.',
     '',
     '## Disagreements',
     '',
@@ -70,6 +85,27 @@ function table(checks: CheckResult[]) {
         `| ${escapeCell(check.title)} | ${check.result} | ${check.score} | ${check.mode} | ${check.deterministic ? 'yes' : 'no'} | ${escapeCell(formatMetadata(check))} | ${escapeCell(check.notes.join(' '))} |`
     ),
   ].join('\n');
+}
+
+function gateTable(gates: MaturityGateOutcome[]) {
+  return [
+    '| Gate | Outcome | Requirements |',
+    '|---|---|---|',
+    ...gates.map(
+      (gate) =>
+        `| ${gate.gate} | ${gate.outcome} | ${escapeCell(gate.requirements.map(formatRequirement).join('; '))} |`
+    ),
+  ].join('\n');
+}
+
+function formatRequirement(requirement: GateRequirementOutcome) {
+  if (requirement.outcome === 'pass' && requirement.satisfied_by)
+    return `${requirement.id}: pass (via ${requirement.satisfied_by})`;
+  if (requirement.outcome === 'unknown')
+    return `${requirement.id}: unknown (unmeasured: ${(requirement.unknown_check_ids ?? requirement.check_ids).join(', ')})`;
+  if (requirement.outcome === 'fail')
+    return `${requirement.id}: fail (${requirement.check_ids.join(', ')})`;
+  return `${requirement.id}: ${requirement.outcome}`;
 }
 
 function heuristicChecks(artifact: ArsArtifact) {

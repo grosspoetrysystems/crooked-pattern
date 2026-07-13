@@ -12,6 +12,25 @@ export type MaturityGate =
   | 'T4 Operable'
   | 'T5 Agent-Native'
   | 'Safety Modifier';
+export type TierGate = Exclude<MaturityGate, 'Safety Modifier'>;
+export type GateOutcome = 'pass' | 'fail' | 'unknown';
+export type GateRequirementKind = 'any_pass' | 'no_known_fail';
+
+export interface GateRequirementOutcome {
+  id: string;
+  description: string;
+  kind: GateRequirementKind;
+  check_ids: string[];
+  outcome: GateOutcome;
+  satisfied_by?: string;
+  unknown_check_ids?: string[];
+}
+
+export interface MaturityGateOutcome {
+  gate: TierGate;
+  outcome: GateOutcome;
+  requirements: GateRequirementOutcome[];
+}
 export type Category =
   | 'crawl_access'
   | 'content_legibility'
@@ -77,6 +96,8 @@ export interface ScoreSummary {
     | 'T3 Structured'
     | 'T4 Operable'
     | 'T5 Agent-Native';
+  // Optional so artifacts generated before gate outcomes existed still parse.
+  gates?: MaturityGateOutcome[];
   categories: Record<string, CategoryScore>;
   measured_categories: number;
   total_categories: number;
