@@ -1,18 +1,34 @@
 {
   "name": "ars",
-  "description": "Agentic Readiness Score scanner wrapper. Phase 4 will expose scan_site over MCP.",
+  "version": "0.1.0",
+  "description": "Agentic Readiness Score scanner. Exposes scan_site over MCP stdio via the ars-mcp binary (dist/mcp.js).",
+  "transport": "stdio",
+  "run": "ars-mcp",
   "tools": [
     {
       "name": "scan_site",
-      "description": "Run ARS source and/or wire checks and return ars.json plus ars-report.md paths.",
+      "description": "Run ARS source and/or wire checks and return the score summary plus ars.json and ars-report.md paths.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "source": { "type": "string" },
-          "url": { "type": "string" }
+          "source": {
+            "type": "string",
+            "description": "source repository path"
+          },
+          "url": {
+            "type": "string",
+            "description": "live URL for wire checks"
+          },
+          "rendered": {
+            "type": "boolean",
+            "description": "use the optional Playwright rendered DOM adapter for wire checks"
+          },
+          "out": {
+            "type": "string",
+            "description": "output directory for ars.json and ars-report.md (default \".\")"
+          }
         }
       }
     }
-  ],
-  "integrity": "phase-4-placeholder"
+  ]
 }

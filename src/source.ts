@@ -494,6 +494,8 @@ async function detectAuthoredTools(root: string, files: Set<string>) {
 }
 
 function isToolDefinitionCandidate(file: string) {
+  // Test files exercise tool surfaces; they do not author them.
+  if (/\.(test|spec)\.[^/.]+$/i.test(file)) return false;
   return /(^|\/)(mcp|webmcp|server-card|openapi|api-catalog|tools?)[^/]*\.(json|ts|tsx|js|mjs|cjs)$/i.test(
     file
   );

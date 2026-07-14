@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { Command } from 'commander';
-import { createPlaywrightRenderedDomAdapter } from '../adapters/playwright.js';
 import {
   readOsvScanReport,
   readSemgrepScanReport,
@@ -10,13 +7,7 @@ import {
 } from '../adapters/supply-chain.js';
 import type { SupplyChainInput } from '../adapters/supply-chain.js';
 import { diffArtifacts } from '../diff.js';
-import { reconcileChecks } from '../reconcile.js';
-import { markdownReport } from '../report.js';
-import { buildArtifact } from '../scoring.js';
-import { runSourcePass } from '../source.js';
-import type { CheckResult } from '../types.js';
-import { assertArsArtifact } from '../validation.js';
-import { runWirePass } from '../wire.js';
+import { runScan } from '../scan.js';
 
 const program = new Command();
 
@@ -59,41 +50,17 @@ program
       const supplyChain = await loadSupplyChainInput(opts);
       if (supplyChain && !opts.source)
         throw new Error('Supply-chain report flags require --source.');
-      const checks: CheckResult[] = [];
-      if (opts.source)
-        checks.push(
-          ...(await runSourcePass(path.resolve(opts.source), { supplyChain }))
-        );
-      if (opts.url)
-        checks.push(
-          ...(await runWirePass(
-            opts.url,
-            opts.rendered
-              ? { adapter: createPlaywrightRenderedDomAdapter() }
-              : undefined
-          ))
-        );
-      reconcileChecks(checks);
-      const artifact = buildArtifact(
-        { source: opts.source, url: opts.url },
-        checks
-      );
-      assertArsArtifact(artifact, 'generated ARS artifact');
-      await mkdir(opts.out, { recursive: true });
-      await writeFile(
-        path.join(opts.out, 'ars.json'),
-        `${JSON.stringify(artifact, null, 2)}\n`
-      );
-      await writeFile(
-        path.join(opts.out, 'ars-report.md'),
-        markdownReport(artifact)
-      );
+      const { artifact, jsonPath, reportPath } = await runScan({
+        source: opts.source,
+        url: opts.url,
+        rendered: opts.rendered,
+        supplyChain,
+        out: opts.out,
+      });
       console.log(
         `ARS final ${artifact.summary.ars_final}/100; readiness ${artifact.summary.ars_readiness}/100; tier ${artifact.summary.tier}`
       );
-      console.log(
-        `Wrote ${path.join(opts.out, 'ars.json')} and ${path.join(opts.out, 'ars-report.md')}`
-      );
+      console.log(`Wrote ${jsonPath} and ${reportPath}`);
     }
   );
 

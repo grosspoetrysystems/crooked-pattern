@@ -52,6 +52,18 @@ The wire pass uses deterministic HTTP and parser-backed HTML/JSON-LD probes by d
 
 Playwright, axe-core, OSV-Scanner, Socket, and Semgrep stay behind explicit extension points so ordinary scans do not require browser or network-dependent security tooling.
 
+## MCP server
+
+The scanner is also packaged as an MCP stdio server (`ars-mcp`, built to `dist/mcp.js`) exposing a single `scan_site` tool whose inputs mirror `ars scan`: `source`, `url`, `rendered`, and `out`. The tool returns the score summary as structured content plus the written `ars.json` / `ars-report.md` paths.
+
+```sh
+pnpm build
+node dist/mcp.js
+# or register with an MCP client, e.g.: claude mcp add ars -- node dist/mcp.js
+```
+
+The authored contract in `mcp/server-card.json` is the same contract the runtime serves: a test connects a real MCP client to the server and asserts the card's tools match the live `tools/list` response, and the source/wire reconciliation check (`both.mcp_tool_count_agreement`) is exercised against this surface in both agreeing and diverging configurations. The CLI and the MCP tool wrap one shared scan pipeline, so scores cannot drift between entry points.
+
 ## Supply-chain evidence
 
 The source pass parses package manager lockfiles into a dependency inventory instead of only checking for lockfile presence. Supported formats are `pnpm-lock.yaml` (v6/v9), `package-lock.json` / `npm-shrinkwrap.json` (v1-v3), `yarn.lock` (classic and berry), and `bun.lock`; the binary `bun.lockb` is detected but not parsed. Parsing is deterministic and offline. The inventory (package names, versions, direct vs transitive split) is attached to `source.lockfile_pinning` as source evidence, and `source.slopsquatting_static_flags` screens the full parsed inventory — including transitive packages — instead of only direct dependencies. If a lockfile cannot be parsed, checks fall back to the filename-presence heuristic and say so; check IDs never change.
