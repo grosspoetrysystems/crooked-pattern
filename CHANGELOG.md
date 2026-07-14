@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Raise test coverage above all configured thresholds (branch coverage 71% → 86%) with wire-check branch tests against a signal-rich fixture server and validation error-path tests; thresholds unchanged.
 - Package the scanner as an MCP stdio server (`ars-mcp`) exposing `scan_site` via the official MCP TypeScript SDK; `mcp/server-card.json` is now the real authored contract, kept consistent with the runtime by tests, and source/wire reconciliation is exercised against the live surface. CLI and MCP share one scan pipeline.
 - Add OSV, Socket, and Semgrep adapter output contracts behind explicit extension points with CLI report ingestion; absent adapters keep the new supply-chain checks `unknown` with `adapter_missing` metadata instead of fabricating results.
 - Fix a CLI test flake by building `dist/` once per vitest run in a global setup instead of racing parallel `pnpm build` calls from separate test suites.
