@@ -9,7 +9,6 @@ const root = path.resolve(import.meta.dirname, '../..');
 
 describe('built CLI', () => {
   it('has exactly one shebang after build', async () => {
-    await execFileAsync('pnpm', ['build'], { cwd: root });
     const built = await readFile(path.join(root, 'dist/cli.js'), 'utf8');
 
     expect(built.startsWith('#!/usr/bin/env node\n')).toBe(true);
@@ -17,8 +16,6 @@ describe('built CLI', () => {
   }, 30_000);
 
   it('runs help and a minimal source scan from dist', async () => {
-    await execFileAsync('pnpm', ['build'], { cwd: root });
-
     const help = await execFileAsync('node', ['dist/cli.js', '--help'], {
       cwd: root,
     });
