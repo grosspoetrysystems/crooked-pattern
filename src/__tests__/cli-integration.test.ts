@@ -23,7 +23,6 @@ describe('CLI integration pipeline', () => {
   let insecure: FixtureServer;
 
   beforeAll(async () => {
-    await execFileAsync('pnpm', ['build'], { cwd: root });
     await rm(outRoot, { force: true, recursive: true });
     await mkdir(outRoot, { recursive: true });
 
@@ -88,6 +87,47 @@ describe('CLI integration pipeline', () => {
     expect(insecureArtifact.summary.exposure_multiplier).toBeLessThan(1);
   }, 30_000);
 
+  it('ingests normalized supply-chain reports as source evidence', async () => {
+    const outDir = path.join(outRoot, 'supply-chain');
+    await runCli([
+      'scan',
+      '--source',
+      'fixtures/lockfiles/pnpm-project',
+      '--osv-report',
+      'fixtures/reports/osv-clean.json',
+      '--out',
+      outDir,
+    ]);
+
+    const artifact = await readArtifact(outDir);
+    expect(validateArsArtifact(artifact)).toEqual([]);
+    expect(findCheck(artifact, 'source.osv_vulnerabilities')?.result).toBe(
+      'pass'
+    );
+    expect(findCheck(artifact, 'source.socket_alerts')?.result).toBe('unknown');
+    expect(findCheck(artifact, 'source.socket_alerts')?.metadata?.status).toBe(
+      'adapter_missing'
+    );
+    expect(
+      findCheck(artifact, 'source.lockfile_pinning')?.metadata?.labels
+    ).toContain('parsed-lockfile');
+  });
+
+  it('rejects malformed supply-chain report files', async () => {
+    const result = await runCliAllowFailure([
+      'scan',
+      '--source',
+      'fixtures/lockfiles/pnpm-project',
+      '--osv-report',
+      'fixtures/reports/invalid-report.json',
+      '--out',
+      path.join(outRoot, 'supply-chain-invalid'),
+    ]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('expected "osv-scanner"');
+  });
+
   it('diffs generated artifacts', async () => {
     const securePath = path.join(outRoot, 'secure/ars.json');
     const insecurePath = path.join(outRoot, 'insecure/ars.json');
@@ -101,7 +141,6 @@ describe('CLI integration pipeline', () => {
   });
 
   it('rejects malformed diff input artifacts', async () => {
-    await execFileAsync('pnpm', ['build'], { cwd: root });
     const validPath = path.join(outRoot, 'secure/ars.json');
     const invalidPath = path.join(outRoot, 'invalid-ars.json');
     const artifact = await readArtifact(path.dirname(validPath));

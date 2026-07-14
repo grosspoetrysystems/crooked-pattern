@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add OSV, Socket, and Semgrep adapter output contracts behind explicit extension points with CLI report ingestion; absent adapters keep the new supply-chain checks `unknown` with `adapter_missing` metadata instead of fabricating results.
 - Fix a CLI test flake by building `dist/` once per vitest run in a global setup instead of racing parallel `pnpm build` calls from separate test suites.
 - Parse pnpm, npm, yarn, and bun lockfiles into a direct/transitive dependency inventory as source evidence, strengthening lockfile pinning and slopsquatting checks; unparseable lockfiles fall back honestly to filename presence.
 - Compute the maturity tier from explicit registry-traceable T1-T5 gates instead of category-score bands, emit per-gate outcomes in `summary.gates`, and surface gate detail in report and diff output. Behavioral change within `ars.v1`: tiers can be lower than the retired band heuristic on partially measured sites; artifacts without `summary.gates` remain valid.

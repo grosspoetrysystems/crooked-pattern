@@ -1,8 +1,21 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { resolveSupplyChainReport } from './adapters/supply-chain.js';
+import type {
+  OsvScanReport,
+  SemgrepScanReport,
+  SocketScanReport,
+  SupplyChainInput,
+  SupplyChainScanContext,
+} from './adapters/supply-chain.js';
 import { check } from './checks.js';
 import { readLockfileInventory } from './lockfile.js';
 import type { CheckResult } from './types.js';
+
+/** @public options for programmatic source scans with supply-chain adapters */
+export interface SourcePassOptions {
+  supplyChain?: SupplyChainInput;
+}
 
 interface PackageManifest {
   dependencies?: Record<string, unknown>;
@@ -31,7 +44,10 @@ const cooldownFiles = [
   '.github/dependabot.yml',
 ];
 
-export async function runSourcePass(root: string): Promise<CheckResult[]> {
+export async function runSourcePass(
+  root: string,
+  options: SourcePassOptions = {}
+): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   const packageJson = await readJson<PackageManifest>(
     path.join(root, 'package.json')
@@ -242,6 +258,18 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
     )
   );
 
+  const scanContext: SupplyChainScanContext = { root, inventory };
+  const [osvReport, socketReport, semgrepReport] = await Promise.all([
+    resolveSupplyChainReport(scanContext, options.supplyChain?.osv),
+    resolveSupplyChainReport(scanContext, options.supplyChain?.socket),
+    resolveSupplyChainReport(scanContext, options.supplyChain?.semgrep),
+  ]);
+  results.push(
+    osvCheck(osvReport),
+    socketCheck(socketReport),
+    semgrepCheck(semgrepReport)
+  );
+
   const authoredToolEvidence = await detectAuthoredTools(root, files);
   results.push(
     check(
@@ -262,6 +290,158 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
   );
 
   return results;
+}
+
+function osvCheck(report: OsvScanReport | undefined): CheckResult {
+  if (!report)
+    return adapterMissingCheck(
+      'source.osv_vulnerabilities',
+      'OSV known vulnerabilities',
+      15,
+      'No OSV adapter or report provided; ordinary scans do not execute security scanners.'
+    );
+  const severe = report.vulnerabilities.filter(
+    (vuln) => vuln.severity === 'critical' || vuln.severity === 'high'
+  );
+  const result = report.vulnerabilities.length
+    ? severe.length
+      ? 'fail'
+      : 'partial'
+    : 'pass';
+  const scanned =
+    report.packages_scanned === undefined
+      ? ''
+      : ` across ${report.packages_scanned} scanned packages`;
+  return check(
+    'source.osv_vulnerabilities',
+    'OSV known vulnerabilities',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    15,
+    result,
+    reportScore(result),
+    [
+      report.vulnerabilities.length
+        ? `OSV report lists ${report.vulnerabilities.length} known vulnerabilities${scanned} (${severe.length} high/critical): ${report.vulnerabilities.map((vuln) => vuln.id).join(', ')}.`
+        : `OSV report lists no known vulnerabilities${scanned}.`,
+    ],
+    {
+      source_value: {
+        vulnerabilities: report.vulnerabilities.length,
+        high_or_critical: severe.length,
+        packages_scanned: report.packages_scanned,
+      },
+      metadata: reportMetadata('osv-report'),
+    }
+  );
+}
+
+function socketCheck(report: SocketScanReport | undefined): CheckResult {
+  if (!report)
+    return adapterMissingCheck(
+      'source.socket_alerts',
+      'Socket supply-chain alerts',
+      10,
+      'No Socket adapter or report provided; ordinary scans do not execute security scanners.'
+    );
+  const severe = report.alerts.filter(
+    (alert) => alert.severity === 'critical' || alert.severity === 'high'
+  );
+  const result = report.alerts.length
+    ? severe.length
+      ? 'fail'
+      : 'partial'
+    : 'pass';
+  return check(
+    'source.socket_alerts',
+    'Socket supply-chain alerts',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    10,
+    result,
+    reportScore(result),
+    [
+      report.alerts.length
+        ? `Socket report lists ${report.alerts.length} alerts (${severe.length} high/critical): ${report.alerts.map((alert) => `${alert.package}:${alert.type}`).join(', ')}.`
+        : 'Socket report lists no supply-chain alerts.',
+    ],
+    {
+      source_value: {
+        alerts: report.alerts.length,
+        high_or_critical: severe.length,
+      },
+      metadata: reportMetadata('socket-report'),
+    }
+  );
+}
+
+function semgrepCheck(report: SemgrepScanReport | undefined): CheckResult {
+  if (!report)
+    return adapterMissingCheck(
+      'source.semgrep_findings',
+      'Semgrep static analysis findings',
+      10,
+      'No Semgrep adapter or report provided; ordinary scans do not execute security scanners.'
+    );
+  const errors = report.findings.filter(
+    (finding) => finding.severity === 'error'
+  );
+  const result = report.findings.length
+    ? errors.length
+      ? 'fail'
+      : 'partial'
+    : 'pass';
+  return check(
+    'source.semgrep_findings',
+    'Semgrep static analysis findings',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    10,
+    result,
+    reportScore(result),
+    [
+      report.findings.length
+        ? `Semgrep report lists ${report.findings.length} findings (${errors.length} error severity): ${report.findings.map((finding) => finding.rule_id).join(', ')}.`
+        : 'Semgrep report lists no findings.',
+    ],
+    {
+      source_value: {
+        findings: report.findings.length,
+        errors: errors.length,
+      },
+      metadata: reportMetadata('semgrep-report'),
+    }
+  );
+}
+
+function adapterMissingCheck(
+  id: string,
+  title: string,
+  weight: number,
+  note: string
+): CheckResult {
+  return check(
+    id,
+    title,
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    weight,
+    'unknown',
+    0,
+    [note]
+  );
+}
+
+function reportScore(result: 'pass' | 'fail' | 'partial') {
+  return result === 'pass' ? 100 : result === 'partial' ? 40 : 0;
+}
+
+function reportMetadata(label: string) {
+  return {
+    confidence: 'high' as const,
+    status: 'implemented' as const,
+    labels: [label],
+  };
 }
 
 async function listFiles(root: string, dir = ''): Promise<Set<string>> {

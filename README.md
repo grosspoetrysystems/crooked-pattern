@@ -55,3 +55,11 @@ Playwright, axe-core, OSV-Scanner, Socket, and Semgrep stay behind explicit exte
 ## Supply-chain evidence
 
 The source pass parses package manager lockfiles into a dependency inventory instead of only checking for lockfile presence. Supported formats are `pnpm-lock.yaml` (v6/v9), `package-lock.json` / `npm-shrinkwrap.json` (v1-v3), `yarn.lock` (classic and berry), and `bun.lock`; the binary `bun.lockb` is detected but not parsed. Parsing is deterministic and offline. The inventory (package names, versions, direct vs transitive split) is attached to `source.lockfile_pinning` as source evidence, and `source.slopsquatting_static_flags` screens the full parsed inventory — including transitive packages — instead of only direct dependencies. If a lockfile cannot be parsed, checks fall back to the filename-presence heuristic and say so; check IDs never change.
+
+Security scanners are integrated as adapter output contracts, not as executed tools:
+
+- `source.osv_vulnerabilities` consumes a normalized `OsvScanReport`.
+- `source.socket_alerts` consumes a normalized `SocketScanReport`.
+- `source.semgrep_findings` consumes a normalized `SemgrepScanReport`.
+
+Each contract accepts either a pre-generated report object or a `SupplyChainAdapter` implementation via `runSourcePass(root, { supplyChain })`; adapters receive the scan root and the parsed lockfile inventory. The CLI can ingest pre-generated normalized reports from disk with `--osv-report <file>`, `--socket-report <file>`, and `--semgrep-report <file>`. When no report or adapter is provided — the default — these checks stay `unknown` with `adapter_missing` metadata: ordinary scans never run scanners, never require the network, and never fabricate a pass or fail from missing evidence.

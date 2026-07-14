@@ -1,0 +1,12 @@
+{
+  "tool": "osv-scanner",
+  "packages_scanned": 4,
+  "vulnerabilities": [
+    {
+      "id": "GHSA-aaaa-bbbb-cccc",
+      "package": "tiny-dep",
+      "version": "1.0.3",
+      "severity": "critical"
+    }
+  ]
+}

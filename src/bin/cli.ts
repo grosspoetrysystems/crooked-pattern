@@ -3,6 +3,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import { createPlaywrightRenderedDomAdapter } from '../adapters/playwright.js';
+import {
+  readOsvScanReport,
+  readSemgrepScanReport,
+  readSocketScanReport,
+} from '../adapters/supply-chain.js';
+import type { SupplyChainInput } from '../adapters/supply-chain.js';
 import { diffArtifacts } from '../diff.js';
 import { reconcileChecks } from '../reconcile.js';
 import { markdownReport } from '../report.js';
@@ -25,19 +31,39 @@ program
     '--rendered',
     'use an optional Playwright rendered DOM adapter for wire checks'
   )
+  .option(
+    '--osv-report <file>',
+    'normalized OSV scan report JSON consumed as source evidence'
+  )
+  .option(
+    '--socket-report <file>',
+    'normalized Socket scan report JSON consumed as source evidence'
+  )
+  .option(
+    '--semgrep-report <file>',
+    'normalized Semgrep scan report JSON consumed as source evidence'
+  )
   .option('--out <dir>', 'output directory', '.')
   .action(
     async (opts: {
       source?: string;
       url?: string;
       rendered?: boolean;
+      osvReport?: string;
+      socketReport?: string;
+      semgrepReport?: string;
       out: string;
     }) => {
       if (!opts.source && !opts.url)
         throw new Error('Provide --source, --url, or both.');
+      const supplyChain = await loadSupplyChainInput(opts);
+      if (supplyChain && !opts.source)
+        throw new Error('Supply-chain report flags require --source.');
       const checks: CheckResult[] = [];
       if (opts.source)
-        checks.push(...(await runSourcePass(path.resolve(opts.source))));
+        checks.push(
+          ...(await runSourcePass(path.resolve(opts.source), { supplyChain }))
+        );
       if (opts.url)
         checks.push(
           ...(await runWirePass(
@@ -79,6 +105,24 @@ program
   .action(async (before: string, after: string) => {
     console.log(await diffArtifacts(before, after));
   });
+
+async function loadSupplyChainInput(opts: {
+  osvReport?: string;
+  socketReport?: string;
+  semgrepReport?: string;
+}): Promise<SupplyChainInput | undefined> {
+  const [osv, socket, semgrep] = await Promise.all([
+    opts.osvReport ? readOsvScanReport(opts.osvReport) : undefined,
+    opts.socketReport ? readSocketScanReport(opts.socketReport) : undefined,
+    opts.semgrepReport ? readSemgrepScanReport(opts.semgrepReport) : undefined,
+  ]);
+  if (!(osv || socket || semgrep)) return undefined;
+  return {
+    ...(osv ? { osv: { report: osv } } : {}),
+    ...(socket ? { socket: { report: socket } } : {}),
+    ...(semgrep ? { semgrep: { report: semgrep } } : {}),
+  };
+}
 
 program.parseAsync(process.argv).catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));

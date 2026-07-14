@@ -1,0 +1,10 @@
+{
+  "tool": "semgrep",
+  "findings": [
+    {
+      "rule_id": "javascript.lang.security.audit.unsafe-eval",
+      "path": "src/index.js",
+      "severity": "warning"
+    }
+  ]
+}

@@ -109,6 +109,36 @@ export const CHECK_REGISTRY = defineRegistry([
     ['parsed-lockfile']
   ),
   definition(
+    'source.osv_vulnerabilities',
+    'OSV known vulnerabilities',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    15,
+    ['Safety Modifier'],
+    adapterMissing,
+    ['osv-report']
+  ),
+  definition(
+    'source.socket_alerts',
+    'Socket supply-chain alerts',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    10,
+    ['Safety Modifier'],
+    adapterMissing,
+    ['socket-report']
+  ),
+  definition(
+    'source.semgrep_findings',
+    'Semgrep static analysis findings',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    10,
+    ['Safety Modifier'],
+    adapterMissing,
+    ['semgrep-report']
+  ),
+  definition(
     'source.authored_agent_tools',
     'authored MCP/WebMCP definitions',
     'agent_operability',
