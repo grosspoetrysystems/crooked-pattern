@@ -50,7 +50,8 @@ export const CHECK_REGISTRY = defineRegistry([
     'SOURCE_ONLY',
     18,
     ['Safety Modifier'],
-    high
+    high,
+    ['parsed-lockfile', 'file-presence']
   ),
   definition(
     'source.minimum_release_age',
@@ -104,7 +105,8 @@ export const CHECK_REGISTRY = defineRegistry([
     'SOURCE_ONLY',
     6,
     ['Safety Modifier'],
-    heuristic
+    heuristic,
+    ['parsed-lockfile']
   ),
   definition(
     'source.authored_agent_tools',

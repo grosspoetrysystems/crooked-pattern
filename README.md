@@ -51,3 +51,7 @@ Gate evaluation preserves the honesty contract:
 The wire pass uses deterministic HTTP and parser-backed HTML/JSON-LD probes by default. It can also consume an optional rendered DOM snapshot through `RenderedDomAdapter` or the opt-in `--rendered` CLI flag for browser-observed text, interactive element names, accessibility summary counts, and layout metrics. When rendered evidence is unavailable, browser-only checks remain `unknown` or explicitly heuristic rather than fabricated.
 
 Playwright, axe-core, OSV-Scanner, Socket, and Semgrep stay behind explicit extension points so ordinary scans do not require browser or network-dependent security tooling.
+
+## Supply-chain evidence
+
+The source pass parses package manager lockfiles into a dependency inventory instead of only checking for lockfile presence. Supported formats are `pnpm-lock.yaml` (v6/v9), `package-lock.json` / `npm-shrinkwrap.json` (v1-v3), `yarn.lock` (classic and berry), and `bun.lock`; the binary `bun.lockb` is detected but not parsed. Parsing is deterministic and offline. The inventory (package names, versions, direct vs transitive split) is attached to `source.lockfile_pinning` as source evidence, and `source.slopsquatting_static_flags` screens the full parsed inventory — including transitive packages — instead of only direct dependencies. If a lockfile cannot be parsed, checks fall back to the filename-presence heuristic and say so; check IDs never change.

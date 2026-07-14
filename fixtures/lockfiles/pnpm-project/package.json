@@ -1,0 +1,10 @@
+{
+  "name": "pnpm-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "tiny-dep": "^1.0.0"
+  },
+  "devDependencies": {
+    "dev-tool": "^2.0.0"
+  }
+}

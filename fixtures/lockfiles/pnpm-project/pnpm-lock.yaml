@@ -1,0 +1,48 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      tiny-dep:
+        specifier: ^1.0.0
+        version: 1.0.3
+    devDependencies:
+      dev-tool:
+        specifier: ^2.0.0
+        version: 2.1.0(peer-lib@3.0.0)
+
+packages:
+
+  '@scope/util@0.2.1':
+    resolution: {integrity: sha512-fixturescopeutil}
+
+  dev-tool@2.1.0:
+    resolution: {integrity: sha512-fixturedevtool}
+    peerDependencies:
+      peer-lib: ^3.0.0
+
+  peer-lib@3.0.0:
+    resolution: {integrity: sha512-fixturepeerlib}
+
+  tiny-dep@1.0.3:
+    resolution: {integrity: sha512-fixturetinydep}
+
+snapshots:
+
+  '@scope/util@0.2.1': {}
+
+  dev-tool@2.1.0(peer-lib@3.0.0):
+    dependencies:
+      '@scope/util': 0.2.1
+      peer-lib: 3.0.0
+
+  peer-lib@3.0.0: {}
+
+  tiny-dep@1.0.3:
+    dependencies:
+      '@scope/util': 0.2.1

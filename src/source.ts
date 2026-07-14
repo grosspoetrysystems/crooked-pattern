@@ -1,6 +1,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { check } from './checks.js';
+import { readLockfileInventory } from './lockfile.js';
 import type { CheckResult } from './types.js';
 
 interface PackageManifest {
@@ -14,10 +15,11 @@ interface ToolCatalog {
 }
 
 const lockfiles = [
+  'pnpm-lock.yaml',
   'package-lock.json',
   'npm-shrinkwrap.json',
-  'pnpm-lock.yaml',
   'yarn.lock',
+  'bun.lock',
   'bun.lockb',
 ];
 const cooldownFiles = [
@@ -65,6 +67,7 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
   );
 
   const foundLockfiles = lockfiles.filter((name) => files.has(name));
+  const inventory = await readLockfileInventory(root, directDeps);
   results.push(
     check(
       'source.lockfile_pinning',
@@ -78,8 +81,20 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
         foundLockfiles.length > 0
           ? `Found ${foundLockfiles.join(', ')}.`
           : 'No supported lockfile found; deterministic installs are not evidenced.',
+        ...(inventory?.parsed
+          ? [
+              `Parsed ${inventory.lockfile} into ${inventory.package_count} packages (${inventory.direct_count} direct, ${inventory.transitive_count} transitive).`,
+            ]
+          : inventory?.note
+            ? [inventory.note]
+            : []),
       ],
-      { source_value: foundLockfiles }
+      {
+        source_value: { lockfiles: foundLockfiles, inventory },
+        metadata: {
+          labels: inventory?.parsed ? ['parsed-lockfile'] : ['file-presence'],
+        },
+      }
     )
   );
 
@@ -188,7 +203,13 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
     )
   );
 
-  const slop = directDeps.filter((dep) => isSuspiciousName(dep));
+  const screenedNames = inventory?.parsed
+    ? [...new Set(inventory.packages.map((entry) => entry.name))]
+    : directDeps;
+  const screenScope = inventory?.parsed
+    ? 'lockfile-inventory'
+    : 'direct-dependencies';
+  const slop = screenedNames.filter((dep) => isSuspiciousName(dep));
   results.push(
     check(
       'source.slopsquatting_static_flags',
@@ -196,16 +217,28 @@ export async function runSourcePass(root: string): Promise<CheckResult[]> {
       'supply_chain_safety',
       'SOURCE_ONLY',
       6,
-      slop.length ? 'fail' : directDeps.length ? 'pass' : 'unknown',
-      slop.length ? 0 : directDeps.length ? 100 : 0,
+      slop.length ? 'fail' : screenedNames.length ? 'pass' : 'unknown',
+      slop.length ? 0 : screenedNames.length ? 100 : 0,
       [
         slop.length
           ? `Suspicious dependency names: ${slop.join(', ')}.`
-          : directDeps.length
-            ? 'No static dependency-name collision flags found.'
+          : screenedNames.length
+            ? `No static dependency-name collision flags found across ${screenedNames.length} ${screenScope === 'lockfile-inventory' ? 'parsed lockfile packages (direct and transitive)' : 'direct dependencies'}.`
             : 'No dependency inventory available.',
       ],
-      { source_value: { flagged: slop } }
+      {
+        source_value: {
+          flagged: slop,
+          screened: screenedNames.length,
+          scope: screenScope,
+        },
+        metadata: {
+          labels:
+            screenScope === 'lockfile-inventory'
+              ? ['heuristic', 'parsed-lockfile']
+              : ['heuristic'],
+        },
+      }
     )
   );
 
