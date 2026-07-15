@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-07-15
+
+- Add a `crooked-pattern` bin alias (alongside `ars`) so `npx @grosspoetrysystems/crooked-pattern scan …` resolves an executable. Without it, npx cannot pick a bin on a multi-bin scoped package and errors with "could not determine executable to run"; the documented quickstart now works as written. `ars` remains the primary command; `ars-mcp` is unchanged.
+
 ## 0.1.0 — 2026-07-15
 
 Initial public release, published as `@grosspoetrysystems/crooked-pattern` (CLI, command `ars`) and `@grosspoetrysystems/crooked-pattern-mcp` (MCP server, command `ars-mcp`).

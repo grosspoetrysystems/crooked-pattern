@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { runScan } from '../scan.js';
 import type { ArsArtifact, MaturityGateOutcome } from '../types.js';
 
-const MCP_SERVER_INFO = { name: 'ars', version: '0.1.0' };
+const MCP_SERVER_INFO = { name: 'ars', version: '0.1.1' };
 
 const SCAN_SITE_TOOL_NAME = 'scan_site';
 

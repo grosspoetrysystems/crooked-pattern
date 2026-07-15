@@ -11,7 +11,7 @@ import { runScan } from '../scan.js';
 
 const program = new Command();
 
-program.name('ars').description('Agentic Readiness Score CLI').version('0.1.0');
+program.name('ars').description('Agentic Readiness Score CLI').version('0.1.1');
 
 program
   .command('scan')

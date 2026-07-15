@@ -1,6 +1,6 @@
 {
   "name": "@grosspoetrysystems/crooked-pattern-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Crooked Pattern (Agentic Readiness Score) \u2014 thin wrapper so MCP client configs can run `npx @grosspoetrysystems/crooked-pattern-mcp`",
   "license": "MIT",
   "publishConfig": {
@@ -14,7 +14,7 @@
   },
   "files": ["bin.js"],
   "dependencies": {
-    "@grosspoetrysystems/crooked-pattern": "0.1.0"
+    "@grosspoetrysystems/crooked-pattern": "0.1.1"
   },
   "engines": {
     "node": ">=20"
