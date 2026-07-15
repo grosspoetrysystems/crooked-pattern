@@ -15,6 +15,11 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # A tag push does not publish on its own: this job pauses here until a
+    # required reviewer approves the `release` environment. That restores the
+    # deliberate human gate at publish time — no stored token, provenance on
+    # every release, and nothing ships without an explicit approval.
+    environment: release
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
