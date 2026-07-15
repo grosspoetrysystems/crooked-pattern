@@ -131,4 +131,6 @@ pnpm coverage
 
 ## Related work
 
-Netlify's [AXIS](https://github.com/netlify/axis) (Agent Experience Index Score) is a related effort that measures the agent experience of services — live endpoints, APIs, and local project structure — by running a real coding agent through scripted scenarios and LLM-grading the resulting transcripts across its own dimensions. The two approaches are complementary: crooked-pattern is a deterministic, static pre-flight lint; AXIS-style evaluation measures behavioral outcomes. crooked-pattern and ARS were developed independently: the checks, categories, and maturity gates here are defined solely by this project's own rubric registry, and no AXIS taxonomy, dimensions, or versions are referenced.
+crooked-pattern takes its shape from [Lighthouse](https://github.com/GoogleChrome/lighthouse): a weighted set of categorized audits that produce a 0–100 score and an actionable report you can run in CI on every change — here applied to agent-readiness and supply-chain safety instead of web performance.
+
+Netlify's [AXIS](https://github.com/netlify/axis) (Agent Experience Index Score) is the behavioral counterpart in this space: it runs a real coding agent through scripted scenarios and grades the transcripts. The two are complementary — AXIS measures what an agent actually accomplishes, while crooked-pattern is a deterministic, static pre-flight that scores the signals and safety posture an agent would encounter. Reach for AXIS to evaluate outcomes; reach for crooked-pattern for a fast, reproducible gate.
