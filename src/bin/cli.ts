@@ -11,7 +11,11 @@ import { runScan } from '../scan.js';
 
 const program = new Command();
 
-program.name('ars').description('Agentic Readiness Score CLI').version('0.1.2');
+// process.env.PKG_VERSION is replaced with package.json's version at build
+// time (tsup define); the fallback only appears in unbuilt dev runs.
+const VERSION = process.env.PKG_VERSION ?? '0.0.0-dev';
+
+program.name('ars').description('Agentic Readiness Score CLI').version(VERSION);
 
 program
   .command('scan')

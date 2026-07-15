@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { runScan } from '../scan.js';
 import type { ArsArtifact, MaturityGateOutcome } from '../types.js';
 
-const MCP_SERVER_INFO = { name: 'ars', version: '0.1.2' };
+// Version is injected from package.json at build time (tsup define); the
+// fallback only appears in unbuilt dev/test runs.
+const MCP_SERVER_INFO = {
+  name: 'ars',
+  version: process.env.PKG_VERSION ?? '0.0.0-dev',
+};
 
 const SCAN_SITE_TOOL_NAME = 'scan_site';
 

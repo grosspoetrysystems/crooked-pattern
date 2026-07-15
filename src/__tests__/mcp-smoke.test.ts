@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -29,6 +29,13 @@ describe('built MCP server (dist/mcp.js)', () => {
   it('completes the handshake and lists scan_site', async () => {
     const tools = await client.listTools();
     expect(tools.tools.map((tool) => tool.name)).toEqual(['scan_site']);
+  });
+
+  it('reports the package.json version (single-sourced at build)', async () => {
+    const { version } = JSON.parse(
+      await readFile(path.join(root, 'package.json'), 'utf8')
+    ) as { version: string };
+    expect(client.getServerVersion()?.version).toBe(version);
   });
 
   it('executes scan_site end-to-end over stdio', async () => {

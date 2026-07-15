@@ -85,7 +85,7 @@ describe('package tarball allowlists', () => {
     );
   });
 
-  it('keeps the CLI and MCP server versions in lockstep with package.json', async () => {
+  it('builds the CLI with package.json version single-sourced (no hand-synced copy)', async () => {
     const main = JSON.parse(
       await readFile(path.join(root, 'package.json'), 'utf8')
     ) as { version: string };
@@ -97,10 +97,13 @@ describe('package tarball allowlists', () => {
     );
     expect(stdout.trim()).toBe(main.version);
 
+    // The source must not hard-code a version string — it is injected at build.
+    const cliSource = await readFile(path.join(root, 'src/bin/cli.ts'), 'utf8');
+    expect(cliSource).not.toMatch(/\.version\(['"]\d+\.\d+\.\d+/);
     const serverSource = await readFile(
       path.join(root, 'src/mcp/server.ts'),
       'utf8'
     );
-    expect(serverSource).toContain(`version: '${main.version}'`);
+    expect(serverSource).not.toMatch(/version:\s*['"]\d+\.\d+\.\d+/);
   }, 30_000);
 });
