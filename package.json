@@ -1,7 +1,7 @@
 {
-  "name": "ars",
+  "name": "crooked-pattern",
   "version": "0.1.0",
-  "description": "Agentic Readiness Score CLI",
+  "description": "Crooked Pattern — Agentic Readiness Score (ARS) scanner, CLI + MCP server",
   "type": "module",
   "packageManager": "pnpm@10.12.1",
   "bin": {
