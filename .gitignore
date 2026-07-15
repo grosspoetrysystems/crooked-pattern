@@ -10,3 +10,7 @@ coverage/
 .turbo/
 .tempor/
 .worktrees/
+
+# Local AI build-methodology (kept out of the product repo)
+.agents/
+.claude/
