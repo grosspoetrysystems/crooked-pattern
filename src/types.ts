@@ -102,8 +102,9 @@ export interface ScoreSummary {
   measured_categories: number;
   total_categories: number;
   safety: {
-    build_time_supply_chain: number;
-    runtime_agent_interaction: number;
+    // null = the corresponding checks were unmeasured (never rendered as 0).
+    build_time_supply_chain: number | null;
+    runtime_agent_interaction: number | null;
   };
 }
 

@@ -82,8 +82,8 @@ export function score(checks: CheckResult[]): ScoreSummary {
     measured_categories: measuredCategories,
     total_categories: readinessCategories.length,
     safety: {
-      build_time_supply_chain: buildSafety ?? 0,
-      runtime_agent_interaction: runtimeSafety ?? 0,
+      build_time_supply_chain: buildSafety,
+      runtime_agent_interaction: runtimeSafety,
     },
   };
 }

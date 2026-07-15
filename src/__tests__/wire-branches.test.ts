@@ -207,18 +207,9 @@ describe('wire pass branch coverage against a signal-rich site', () => {
 });
 
 describe('wire pass against an unreachable https host', () => {
-  it('normalizes bare hostnames to https and degrades honestly', async () => {
-    const checks = await runWirePass('127.0.0.1:9');
-
-    expect(findCheck(checks, 'wire.https')?.result).toBe('pass');
-    expect(findCheck(checks, 'wire.robots')?.result).toBe('fail');
-    expect(findCheck(checks, 'wire.llms_txt_present')?.result).toBe('unknown');
-    expect(findCheck(checks, 'wire.initial_html_content')?.result).toBe(
-      'unknown'
-    );
-    expect(findCheck(checks, 'wire.manifest_pinning')?.result).toBe('unknown');
-    expect(findCheck(checks, 'wire.oauth_scope_tightness')?.result).toBe(
-      'unknown'
+  it('normalizes bare hostnames to https and reports an operational error', async () => {
+    await expect(runWirePass('127.0.0.1:9')).rejects.toThrow(
+      /could not reach https:\/\/127\.0\.0\.1:9/i
     );
   }, 30_000);
 });

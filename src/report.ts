@@ -15,7 +15,7 @@ export function markdownReport(artifact: ArsArtifact) {
     (check) => check.agreement_state === 'disagree'
   );
 
-  return [
+  const lines: (string | undefined)[] = [
     '# Agentic Readiness Score Report',
     '',
     `Generated: ${artifact.generated_at}`,
@@ -23,9 +23,11 @@ export function markdownReport(artifact: ArsArtifact) {
     `- ARS final: **${s.ars_final}/100**`,
     `- ARS readiness: **${s.ars_readiness}/100** (${s.measured_categories} of ${s.total_categories} categories measured)`,
     `- Exposure multiplier: **${s.exposure_multiplier}**`,
+    `  - ${exposureExplanation(artifact)}`,
     `- Maturity tier: **${s.tier}** (highest consecutive gate passed)`,
-    `- Build-time supply-chain safety: **${s.safety.build_time_supply_chain}/100**`,
-    `- Runtime agent-interaction safety: **${s.safety.runtime_agent_interaction}/100**`,
+    blockingGateLine(s.gates),
+    `- Build-time supply-chain safety: **${safetyValue(s.safety.build_time_supply_chain)}**`,
+    `- Runtime agent-interaction safety: **${safetyValue(s.safety.runtime_agent_interaction)}**`,
     '',
     '## Category Scores',
     '',
@@ -68,12 +70,43 @@ export function markdownReport(artifact: ArsArtifact) {
     '## Caveats',
     '',
     ...artifact.caveats.map((caveat) => `- ${caveat}`),
-    ...heuristicChecks(artifact).map(
-      (check) =>
-        `- ${check.title} is currently marked ${check.metadata?.confidence}/${check.metadata?.status}; treat it as a deterministic heuristic, not definitive proof.`
-    ),
+    ...heuristicCaveatLine(artifact),
     '',
-  ].join('\n');
+  ];
+  return lines.filter((line): line is string => line !== undefined).join('\n');
+}
+
+function safetyValue(value: number | null) {
+  return value === null ? 'unassessed' : `${value}/100`;
+}
+
+function exposureExplanation(artifact: ArsArtifact) {
+  const s = artifact.summary;
+  if (s.exposure_multiplier >= 1)
+    return 'No unsafe-exposure penalty applied: either no live agent interface was detected or runtime safety checks did not fail.';
+  return `Final score is readiness × ${s.exposure_multiplier} because the site exposes a live agent interface while measured runtime agent-interaction safety is ${safetyValue(s.safety.runtime_agent_interaction)} — see the Safety Modifier checks to earn this back.`;
+}
+
+function blockingGateLine(gates: MaturityGateOutcome[] | undefined) {
+  const blocking = gates?.find((gate) => gate.outcome !== 'pass');
+  if (!blocking) return undefined;
+  const unmet = blocking.requirements
+    .filter((requirement) => requirement.outcome !== 'pass')
+    .map((requirement) => `${requirement.id} (${requirement.outcome})`)
+    .join(', ');
+  return `  - Blocking gate: **${blocking.gate}** — unmet requirements: ${unmet}. Clearing this gate is the next tier step.`;
+}
+
+function heuristicCaveatLine(artifact: ArsArtifact): string[] {
+  const heuristics = heuristicChecks(artifact);
+  if (!heuristics.length) return [];
+  return [
+    `- Heuristic-confidence checks in this run: ${heuristics
+      .map((check) => check.title)
+      .join(
+        '; '
+      )}. Treat each as a deterministic heuristic, not definitive proof.`,
+  ];
 }
 
 function table(checks: CheckResult[]) {
@@ -82,7 +115,7 @@ function table(checks: CheckResult[]) {
     '|---|---:|---:|---|---|---|---|',
     ...checks.map(
       (check) =>
-        `| ${escapeCell(check.title)} | ${check.result} | ${check.score} | ${check.mode} | ${check.deterministic ? 'yes' : 'no'} | ${escapeCell(formatMetadata(check))} | ${escapeCell(check.notes.join(' '))} |`
+        `| ${escapeCell(check.title)} | ${check.result} | ${check.result === 'unknown' ? '–' : check.score} | ${check.mode} | ${check.deterministic ? 'yes' : 'no'} | ${escapeCell(formatMetadata(check))} | ${escapeCell(check.notes.join(' '))} |`
     ),
   ].join('\n');
 }

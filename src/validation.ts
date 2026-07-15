@@ -264,16 +264,29 @@ function validateSafety(value: unknown, path: string, issues: string[]) {
     issues.push(`${path} must be an object`);
     return;
   }
-  requireScore(
+  requireScoreOrNull(
     value.build_time_supply_chain,
     `${path}.build_time_supply_chain`,
     issues
   );
-  requireScore(
+  requireScoreOrNull(
     value.runtime_agent_interaction,
     `${path}.runtime_agent_interaction`,
     issues
   );
+}
+
+function requireScoreOrNull(value: unknown, path: string, issues: string[]) {
+  if (value === null) return;
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > 100
+  )
+    issues.push(
+      `${path} must be a finite number between 0 and 100, or null when unmeasured`
+    );
 }
 
 function validateChecks(value: unknown, path: string, issues: string[]) {

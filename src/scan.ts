@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createPlaywrightRenderedDomAdapter } from './adapters/playwright.js';
 import type { SupplyChainInput } from './adapters/supply-chain.js';
@@ -30,14 +30,21 @@ export interface ScanOutcome {
 // cannot drift.
 export async function runScan(request: ScanRequest): Promise<ScanOutcome> {
   if (!request.source && !request.url)
-    throw new Error('Provide --source, --url, or both.');
+    throw new Error('Provide a source path, a url, or both.');
   const checks: CheckResult[] = [];
-  if (request.source)
+  if (request.source) {
+    const sourceRoot = path.resolve(request.source);
+    const info = await stat(sourceRoot).catch(() => undefined);
+    if (!info?.isDirectory())
+      throw new Error(
+        `Source path ${JSON.stringify(request.source)} does not exist or is not a directory.`
+      );
     checks.push(
-      ...(await runSourcePass(path.resolve(request.source), {
+      ...(await runSourcePass(sourceRoot, {
         supplyChain: request.supplyChain,
       }))
     );
+  }
   if (request.url)
     checks.push(
       ...(await runWirePass(

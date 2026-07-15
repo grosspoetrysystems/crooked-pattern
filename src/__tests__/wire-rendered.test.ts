@@ -1,18 +1,39 @@
-import { describe, expect, it } from 'vitest';
+import { type Server, createServer } from 'node:http';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { RenderedDomSnapshot } from '../adapters/playwright.js';
 import { runWirePass } from '../wire.js';
 
 describe('rendered wire evidence', () => {
-  const url = 'http://127.0.0.1:9';
+  let server: Server;
+  let url: string;
+
+  beforeAll(async () => {
+    server = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/html' });
+      response.end('<html><body><p>static fixture</p></body></html>');
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    if (!address || typeof address === 'string')
+      throw new Error('Could not bind fixture server.');
+    url = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  });
 
   it('uses optional rendered adapter snapshots for text, accessibility, labels, and layout metrics', async () => {
-    const snapshot = renderedSnapshot(url);
     const seenUrls: string[] = [];
     const checks = await runWirePass(url, {
       adapter: {
-        snapshot(url) {
-          seenUrls.push(url);
-          return snapshot;
+        snapshot(snapshotUrl) {
+          seenUrls.push(snapshotUrl);
+          return renderedSnapshot(snapshotUrl);
         },
       },
     });

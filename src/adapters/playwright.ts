@@ -145,7 +145,17 @@ async function optionalImportPlaywright(): Promise<PlaywrightModule> {
   }
 }
 
-function readInteractiveElements(): RenderedInteractiveElement[] {
+// Serialized into the browser context by page.evaluate: these functions must
+// stay fully self-contained (no references to module-scope helpers), or they
+// throw ReferenceErrors inside the page.
+export function readInteractiveElements(): RenderedInteractiveElement[] {
+  function cssSelector(element: HTMLElement) {
+    if (element.id) return `#${CSS.escape(element.id)}`;
+    const tag = element.tagName.toLowerCase();
+    const name = element.getAttribute('name');
+    if (name) return `${tag}[name="${CSS.escape(name)}"]`;
+    return tag;
+  }
   const selector = [
     'a[href]',
     'button',
@@ -177,18 +187,36 @@ function readInteractiveElements(): RenderedInteractiveElement[] {
   );
 }
 
-function readPageMetrics(): RenderedPageMetrics {
-  const layoutEntries = performance.getEntriesByType('layout-shift') as Array<
-    PerformanceEntry & { hadRecentInput?: boolean; value?: number }
-  >;
+export function readPageMetrics(): RenderedPageMetrics {
+  // Layout Instability entries reach PerformanceObserver buffers, not the
+  // getEntriesByType timeline; when the API is unsupported or no entries can
+  // be observed, CLS must stay undefined (unknown), never a fabricated 0.
+  let cumulativeLayoutShift: number | undefined;
+  try {
+    if (
+      typeof PerformanceObserver !== 'undefined' &&
+      PerformanceObserver.supportedEntryTypes?.includes('layout-shift')
+    ) {
+      const observer = new PerformanceObserver(() => {
+        /* records are drained synchronously below */
+      });
+      observer.observe({ type: 'layout-shift', buffered: true });
+      const entries = observer.takeRecords() as Array<
+        PerformanceEntry & { hadRecentInput?: boolean; value?: number }
+      >;
+      observer.disconnect();
+      cumulativeLayoutShift = entries
+        .filter((entry) => !entry.hadRecentInput)
+        .reduce((sum, entry) => sum + (entry.value ?? 0), 0);
+    }
+  } catch {
+    cumulativeLayoutShift = undefined;
+  }
   const resourceEntries = performance.getEntriesByType('resource') as Array<
     PerformanceEntry & { transferSize?: number }
   >;
-  const cumulativeLayoutShift = layoutEntries
-    .filter((entry) => !entry.hadRecentInput)
-    .reduce((sum, entry) => sum + (entry.value ?? 0), 0);
   return {
-    cumulativeLayoutShift,
+    ...(cumulativeLayoutShift === undefined ? {} : { cumulativeLayoutShift }),
     scriptCount: document.scripts.length,
     transferBytes: Math.round(
       resourceEntries.reduce((sum, entry) => sum + (entry.transferSize ?? 0), 0)
@@ -213,12 +241,4 @@ interface AxeResult {
   violations?: unknown[];
   incomplete?: unknown[];
   passes?: unknown[];
-}
-
-function cssSelector(element: HTMLElement) {
-  if (element.id) return `#${CSS.escape(element.id)}`;
-  const tag = element.tagName.toLowerCase();
-  const name = element.getAttribute('name');
-  if (name) return `${tag}[name="${CSS.escape(name)}"]`;
-  return tag;
 }

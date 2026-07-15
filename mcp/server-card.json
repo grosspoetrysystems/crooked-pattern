@@ -7,7 +7,7 @@
   "tools": [
     {
       "name": "scan_site",
-      "description": "Run ARS source and/or wire checks and return the score summary plus ars.json and ars-report.md paths.",
+      "description": "Compute the Agentic Readiness Score (ARS, 0-100 plus a T0-T5 maturity tier) for a repo and/or live site. Requires at least one of `source` (local path; supply-chain and authored-tool checks) or `url` (live wire checks: crawlability, structure, MCP surface, safety posture). Writes ars.json and ars-report.md into `out` (relative to the server process) and returns the score summary, the highest-impact recommendations, and the requirements blocking the next maturity tier.",
       "inputSchema": {
         "type": "object",
         "properties": {

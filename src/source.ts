@@ -1,4 +1,5 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveSupplyChainReport } from './adapters/supply-chain.js';
 import type {
@@ -191,12 +192,14 @@ export async function runSourcePass(
       'supply_chain_safety',
       'SOURCE_ONLY',
       12,
-      provenance ? 'pass' : 'fail',
+      provenance ? 'pass' : ciFiles.length ? 'fail' : 'unknown',
       provenance ? 100 : 0,
       [
         provenance
           ? 'Detected provenance/signing terms in CI.'
-          : 'No SLSA, Sigstore, cosign, or npm provenance evidence found.',
+          : ciFiles.length
+            ? 'No SLSA, Sigstore, cosign, or npm provenance evidence found in CI workflows.'
+            : 'No CI workflows available to inspect.',
       ]
     )
   );
@@ -525,27 +528,34 @@ function reportMetadata(label: string) {
   };
 }
 
+// Universal build/VCS output dirs only — project-specific names must not be
+// blind-spotted in scanned user repos. Keys use POSIX separators on every
+// platform; symlinks are skipped (dangling links and cycles must not abort
+// or hang a scan).
+const EXCLUDED_DIRS = [
+  'node_modules',
+  '.git',
+  'dist',
+  'coverage',
+  '.tempor',
+  '.pnpm-store',
+];
+
 async function listFiles(root: string, dir = ''): Promise<Set<string>> {
   const out = new Set<string>();
-  const abs = path.join(root, dir);
-  for (const entry of await readdir(abs)) {
-    if (
-      [
-        'node_modules',
-        '.git',
-        'dist',
-        'coverage',
-        '.tempor',
-        '.pnpm-store',
-        'fixtures',
-      ].includes(entry)
-    )
-      continue;
-    const rel = path.join(dir, entry);
-    const info = await stat(path.join(root, rel));
-    if (info.isDirectory()) {
+  let entries: Dirent[];
+  try {
+    entries = await readdir(path.join(root, dir), { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (EXCLUDED_DIRS.includes(entry.name)) continue;
+    if (entry.isSymbolicLink()) continue;
+    const rel = dir ? `${dir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
       for (const nested of await listFiles(root, rel)) out.add(nested);
-    } else {
+    } else if (entry.isFile()) {
       out.add(rel);
     }
   }
@@ -575,9 +585,13 @@ async function detectAuthoredTools(root: string, files: Set<string>) {
 }
 
 function isToolDefinitionCandidate(file: string) {
-  // Test files exercise tool surfaces; they do not author them.
+  // Test files and fixtures exercise tool surfaces; they do not author them.
   if (/\.(test|spec)\.[^/.]+$/i.test(file)) return false;
-  return /(^|\/)(mcp|webmcp|server-card|openapi|api-catalog|tools?)[^/]*\.(json|ts|tsx|js|mjs|cjs)$/i.test(
+  if (/(^|\/)(fixtures?|testdata|__mocks__|__fixtures__)\//i.test(file))
+    return false;
+  // The keyword must be a whole token in the basename (mcp-server.ts,
+  // tools.json) — prefixes like tooltip.tsx or toolbar.ts do not qualify.
+  return /(^|\/)(mcp|webmcp|server-card|openapi|api-catalog|tools?)([.-][^/]*)?\.(json|ts|tsx|js|mjs|cjs)$/i.test(
     file
   );
 }
@@ -618,11 +632,12 @@ function objectStringValue(value: unknown, key: string) {
 
 function toolsFromCode(text: string) {
   const tools = new Set<string>();
+  // Only explicit tool-registration calls count as authored tools. Generic
+  // register(...) calls and bare `name:` properties over-match UI code and
+  // would fabricate T4 evidence (and phantom T5 disagreement vetoes).
   const patterns = [
     /registerTool\s*\(\s*["'`]([^"'`]+)["'`]/g,
-    /register\s*\(\s*["'`]([^"'`]+)["'`]/g,
-    /tool\s*\(\s*["'`]([^"'`]+)["'`]/g,
-    /\bname\s*:\s*["'`]([^"'`]+)["'`]/g,
+    /\.tool\s*\(\s*["'`]([^"'`]+)["'`]/g,
   ];
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) tools.add(match[1].trim());
@@ -662,19 +677,20 @@ async function readMany(root: string, files: string[]) {
 async function detectCooldown(root: string, files: Set<string>) {
   const relevant = cooldownFiles.filter((file) => files.has(file));
   const text = await readMany(root, relevant);
-  const patterns = [
-    /(minimumReleaseAge)\s*:\s*(\d+)/i,
-    /minimum-release-age\s*=\s*(\d+)/i,
-    /npmMinimalAgeGate\s*:\s*(\d+)/i,
-    /cooldown\s*:\s*["']?(\d+)\s*(days?|d)?/i,
-    /minimum_release_age\s*=\s*(\d+)/i,
+  // Keys may be quoted (JSON configs like renovate.json) or bare (YAML/TOML);
+  // the single capture group is always the numeric value.
+  const patterns: { regex: RegExp; minutes?: boolean }[] = [
+    { regex: /["']?minimumReleaseAge["']?\s*:\s*["']?(\d+)/i, minutes: true },
+    { regex: /minimum-release-age\s*=\s*["']?(\d+)/i },
+    { regex: /["']?npmMinimalAgeGate["']?\s*:\s*["']?(\d+)/i },
+    { regex: /["']?cooldown["']?\s*:\s*["']?(\d+)\s*(?:days?|d)?/i },
+    { regex: /minimum_release_age\s*=\s*["']?(\d+)/i },
   ];
   for (const pattern of patterns) {
-    const match = text.match(pattern);
+    const match = text.match(pattern.regex);
     if (match) {
-      const rawValue = Number(match[2] ?? match[1]);
-      const days =
-        match[1] === 'minimumReleaseAge' ? rawValue / 1440 : rawValue;
+      const rawValue = Number(match[1]);
+      const days = pattern.minutes ? rawValue / 1440 : rawValue;
       return {
         days,
         files: relevant,

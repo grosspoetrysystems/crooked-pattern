@@ -1,13 +1,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { runScan } from '../scan.js';
+import type { ArsArtifact, MaturityGateOutcome } from '../types.js';
 
 const MCP_SERVER_INFO = { name: 'ars', version: '0.1.0' };
 
 const SCAN_SITE_TOOL_NAME = 'scan_site';
 
 const SCAN_SITE_DESCRIPTION =
-  'Run ARS source and/or wire checks and return the score summary plus ars.json and ars-report.md paths.';
+  'Compute the Agentic Readiness Score (ARS, 0-100 plus a T0-T5 maturity tier) for a repo and/or live site. Requires at least one of `source` (local path; supply-chain and authored-tool checks) or `url` (live wire checks: crawlability, structure, MCP surface, safety posture). Writes ars.json and ars-report.md into `out` (relative to the server process) and returns the score summary, the highest-impact recommendations, and the requirements blocking the next maturity tier.';
 
 const scanSiteInputShape = {
   source: z.string().optional().describe('source repository path'),
@@ -30,7 +31,65 @@ const scanSiteOutputShape = {
   tier: z.string(),
   json_path: z.string(),
   report_path: z.string(),
+  top_recommendations: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        result: z.string(),
+        weight: z.number(),
+        note: z.string(),
+      })
+    )
+    .describe('highest-weight failing or partial checks, most impactful first'),
+  gate_blockers: z
+    .object({
+      gate: z.string(),
+      requirements: z.array(
+        z.object({
+          id: z.string(),
+          outcome: z.string(),
+          check_ids: z.array(z.string()),
+        })
+      ),
+    })
+    .optional()
+    .describe(
+      'first maturity gate not yet passed and its unmet requirements; absent when every gate passes'
+    ),
 };
+
+function topRecommendations(artifact: ArsArtifact) {
+  return artifact.checks
+    .filter((check) => check.result === 'fail' || check.result === 'partial')
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 3)
+    .map((check) => ({
+      id: check.id,
+      title: check.title,
+      result: check.result,
+      weight: check.weight,
+      note: check.notes.join(' '),
+    }));
+}
+
+function gateBlockers(gates: MaturityGateOutcome[] | undefined) {
+  const blocking = gates?.find((gate) => gate.outcome !== 'pass');
+  if (!blocking) return undefined;
+  return {
+    gate: blocking.gate,
+    requirements: blocking.requirements
+      .filter((requirement) => requirement.outcome !== 'pass')
+      .map((requirement) => ({
+        id: requirement.id,
+        outcome: requirement.outcome,
+        check_ids:
+          requirement.outcome === 'unknown'
+            ? (requirement.unknown_check_ids ?? requirement.check_ids)
+            : requirement.check_ids,
+      })),
+  };
+}
 
 export function createArsMcpServer(): McpServer {
   const server = new McpServer(MCP_SERVER_INFO);
@@ -49,12 +108,15 @@ export function createArsMcpServer(): McpServer {
         rendered,
         out: out ?? '.',
       });
+      const blockers = gateBlockers(outcome.artifact.summary.gates);
       const structured = {
         ars_final: outcome.artifact.summary.ars_final,
         ars_readiness: outcome.artifact.summary.ars_readiness,
         tier: outcome.artifact.summary.tier,
         json_path: outcome.jsonPath,
         report_path: outcome.reportPath,
+        top_recommendations: topRecommendations(outcome.artifact),
+        ...(blockers ? { gate_blockers: blockers } : {}),
       };
       return {
         content: [

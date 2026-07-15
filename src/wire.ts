@@ -34,14 +34,18 @@ export async function runWirePass(
 ): Promise<CheckResult[]> {
   const url = normalizeUrl(inputUrl);
   const results: CheckResult[] = [];
-  const page = await fetchText(url);
+  const page = await fetchMainPage(url);
   const html = page?.text ?? '';
   const parsedHtml = parseHtmlEvidence(html);
   const rendered = await resolveRenderedDom(url, renderedDom);
   const origin = new URL(url).origin;
 
-  const robots = await fetchText(`${origin}/robots.txt`);
-  const sitemap = await fetchText(`${origin}/sitemap.xml`);
+  const robots = nonHtml(await fetchText(`${origin}/robots.txt`));
+  const sitemapRaw = await fetchText(`${origin}/sitemap.xml`);
+  const sitemap =
+    sitemapRaw && /<(urlset|sitemapindex)[\s>]/i.test(sitemapRaw.text)
+      ? sitemapRaw
+      : undefined;
   const llms = await firstFetch([
     `${origin}/.well-known/llms.txt`,
     `${origin}/llms.txt`,
@@ -50,16 +54,22 @@ export async function runWirePass(
   const serverCard = await fetchText(
     `${origin}/.well-known/mcp/server-card.json`
   );
-  const openapi = await firstFetch([
-    `${origin}/openapi.json`,
-    `${origin}/.well-known/api-catalog`,
-    `${origin}/api-catalog.json`,
-  ]);
-  const oauth = await firstFetch([
-    `${origin}/.well-known/oauth-authorization-server`,
-    `${origin}/.well-known/openid-configuration`,
-  ]);
-  const agents = await fetchText(`${origin}/AGENTS.md`);
+  const openapi = jsonObjectWith(
+    await firstFetch([
+      `${origin}/openapi.json`,
+      `${origin}/.well-known/api-catalog`,
+      `${origin}/api-catalog.json`,
+    ]),
+    ['openapi', 'swagger', 'paths', 'linkset']
+  );
+  const oauth = jsonObjectWith(
+    await firstFetch([
+      `${origin}/.well-known/oauth-authorization-server`,
+      `${origin}/.well-known/openid-configuration`,
+    ]),
+    ['issuer', 'authorization_endpoint']
+  );
+  const agents = nonHtml(await fetchText(`${origin}/AGENTS.md`));
 
   results.push(
     check(
@@ -86,12 +96,14 @@ export async function runWirePass(
       'crawl_access',
       'WIRE_ONLY',
       4,
-      aiDirectives ? 'pass' : 'partial',
-      aiDirectives ? 100 : 40,
+      robots ? (aiDirectives ? 'pass' : 'partial') : 'unknown',
+      aiDirectives ? 100 : robots ? 40 : 0,
       [
-        aiDirectives
-          ? 'robots.txt includes explicit AI crawler directives.'
-          : 'No explicit AI crawler directives found; this may be intentional but is less legible to agents.',
+        robots
+          ? aiDirectives
+            ? 'robots.txt includes explicit AI crawler directives.'
+            : 'No explicit AI crawler directives found; this may be intentional but is less legible to agents.'
+          : 'robots.txt unavailable; AI crawler directives are not assessable.',
       ]
     )
   );
@@ -140,7 +152,7 @@ export async function runWirePass(
       'crawl_access',
       'WIRE_ONLY',
       0.05,
-      contentSignals.length ? 'pass' : page || robots ? 'unknown' : 'unknown',
+      contentSignals.length ? 'pass' : 'unknown',
       contentSignals.length ? 100 : 0,
       [
         contentSignals.length
@@ -337,7 +349,7 @@ export async function runWirePass(
   );
 
   const parsedServerCard = serverCard
-    ? safeJson<ServerCard>(serverCard.text)
+    ? plainObject(safeJson<ServerCard>(serverCard.text))
     : undefined;
   const liveTools = extractToolNames(parsedServerCard);
   const liveToolCount = liveTools.length;
@@ -664,7 +676,7 @@ export async function runWirePass(
     )
   );
 
-  results.push(ruleOfTwoCheck(parsedServerCard));
+  results.push(ruleOfTwoCheck(parsedServerCard, Boolean(serverCard)));
   results.push(
     check(
       'wire.manifest_pinning',
@@ -687,10 +699,7 @@ export async function runWirePass(
       ]
     )
   );
-  const hiddenInjection =
-    /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|ignore previous|system prompt|developer message/i.test(
-      html
-    );
+  const injectionFindings = detectInjectionSurface(html);
   results.push(
     check(
       'wire.indirect_injection_surface',
@@ -698,13 +707,12 @@ export async function runWirePass(
       'runtime_agent_safety',
       'WIRE_ONLY',
       25,
-      hiddenInjection ? 'fail' : 'pass',
-      hiddenInjection ? 0 : 100,
-      [
-        hiddenInjection
-          ? 'Hidden text or prompt-like instruction patterns detected.'
-          : 'No obvious hidden prompt-injection patterns found.',
-      ]
+      injectionFindings.length ? 'fail' : 'pass',
+      injectionFindings.length ? 0 : 100,
+      injectionFindings.length
+        ? injectionFindings.slice(0, 5)
+        : ['No hidden text payloads or injection-imperative phrases found.'],
+      { wire_value: { findings: injectionFindings.length } }
     )
   );
   const scopes = parsedServerCard
@@ -733,8 +741,49 @@ export async function runWirePass(
   return results;
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 function normalizeUrl(input: string) {
-  return /^https?:\/\//i.test(input) ? input : `https://${input}`;
+  const candidate = /^https?:\/\//i.test(input) ? input : `https://${input}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error(`Invalid URL ${JSON.stringify(input)}.`);
+  }
+  const host = parsed.hostname;
+  if (!(host.includes('.') || host.includes(':') || host === 'localhost'))
+    throw new Error(
+      `Invalid URL ${JSON.stringify(input)}: ${JSON.stringify(host)} is not a plausible hostname.`
+    );
+  return candidate;
+}
+
+// The main page distinguishes network-level failure (DNS, refused, timeout)
+// from an HTTP response: an unreachable origin is an operational error, not
+// evidence, and must never be scored as pass/fail results.
+async function fetchMainPage(url: string): Promise<Fetched | undefined> {
+  try {
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return undefined;
+    return {
+      url,
+      status: res.status,
+      headers: res.headers,
+      text: await res.text(),
+    };
+  } catch (error) {
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    throw new Error(`Could not reach ${url}: ${cause}`);
+  }
 }
 
 async function fetchText(
@@ -742,7 +791,11 @@ async function fetchText(
   headers: Record<string, string> = {}
 ): Promise<Fetched | undefined> {
   try {
-    const res = await fetch(url, { headers, redirect: 'follow' });
+    const res = await fetch(url, {
+      headers,
+      redirect: 'follow',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) return undefined;
     return {
       url,
@@ -753,6 +806,30 @@ async function fetchText(
   } catch {
     return undefined;
   }
+}
+
+// SPA catch-all rewrites answer every path with 200 index.html; a well-known
+// endpoint only counts when its body is plausible for the format.
+function nonHtml(fetched: Fetched | undefined): Fetched | undefined {
+  if (!fetched) return undefined;
+  return fetched.text.trimStart().startsWith('<') ? undefined : fetched;
+}
+
+function jsonObjectWith(
+  fetched: Fetched | undefined,
+  keys: string[]
+): Fetched | undefined {
+  if (!fetched) return undefined;
+  const parsed = safeJson<Record<string, unknown>>(fetched.text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    return undefined;
+  return keys.some((key) => key in parsed) ? fetched : undefined;
+}
+
+function plainObject<T>(value: T | undefined): T | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : undefined;
 }
 
 async function firstFetch(urls: string[]) {
@@ -894,6 +971,33 @@ function analyzeRenderedFields(
   };
 }
 
+// Deterministic injection-surface heuristic. Two signals, both with quoted
+// evidence: (1) inline-hidden elements that carry a text payload — ordinary
+// utility CSS in a stylesheet does not match; (2) injection-imperative
+// phrases. Bare `display:none` or small font sizes never fail on their own.
+const HIDDEN_TEXT_PATTERN =
+  /style\s*=\s*["'][^"']*(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d]))[^"']*["'][^>]*>\s*([^<]{12,})/gi;
+const INJECTION_PHRASE_PATTERN =
+  /(?:ignore|disregard)\s+(?:all\s+)?previous\s+(?:instructions|messages|prompts)/gi;
+
+function detectInjectionSurface(html: string): string[] {
+  const findings: string[] = [];
+  for (const match of html.matchAll(HIDDEN_TEXT_PATTERN)) {
+    findings.push(`Hidden-styled text payload: "${snippet(match[1])}"`);
+  }
+  for (const match of html.matchAll(INJECTION_PHRASE_PATTERN)) {
+    const start = Math.max(0, (match.index ?? 0) - 20);
+    const context = html.slice(start, (match.index ?? 0) + match[0].length);
+    findings.push(`Injection-imperative phrase: "${snippet(context)}"`);
+  }
+  return findings;
+}
+
+function snippet(text: string): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  return collapsed.length > 80 ? `${collapsed.slice(0, 77)}...` : collapsed;
+}
+
 type RuleOfTwoClasses = Partial<Record<RuleOfTwoClass, string[]>>;
 
 interface ToolClassification {
@@ -905,7 +1009,10 @@ interface ToolClassification {
 // Rule-of-Two v0.1 (docs/scope-freeze-v0.1.md, D2): a machine-checkable
 // predicate over declared MCP tool schemas. Page HTML plays no part; absent
 // tool schemas yield unknown, never a fabricated pass/fail.
-function ruleOfTwoCheck(card: ServerCard | undefined): CheckResult {
+function ruleOfTwoCheck(
+  card: ServerCard | undefined,
+  cardServed: boolean
+): CheckResult {
   const declaredTools = Array.isArray(card?.tools) ? card.tools : undefined;
   if (!declaredTools) {
     return check(
@@ -917,7 +1024,9 @@ function ruleOfTwoCheck(card: ServerCard | undefined): CheckResult {
       'unknown',
       0,
       [
-        'No MCP tool schemas discoverable (no server card with a declared tools array); Rule-of-Two posture is not assessable.',
+        cardServed
+          ? 'An MCP server card is served but declares no tools array; Rule-of-Two posture over declared tool schemas is not assessable.'
+          : 'No MCP server card discoverable, so no tool schemas exist to assess. This is expected for sites without an MCP surface and does not penalize the score.',
       ],
       { wire_value: { lexicon_version: RULE_OF_TWO_LEXICON.version } }
     );

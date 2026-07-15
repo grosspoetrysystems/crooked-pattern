@@ -140,6 +140,59 @@ describe('CLI integration pipeline', () => {
     expect(diff.stdout).toContain('wire.rule_of_two');
   });
 
+  it('gates CI with --fail-on regressions and exits cleanly otherwise', async () => {
+    const securePath = path.join(outRoot, 'secure/ars.json');
+    const insecurePath = path.join(outRoot, 'insecure/ars.json');
+
+    const regressed = await runCliAllowFailure([
+      'diff',
+      securePath,
+      insecurePath,
+      '--fail-on',
+      'score-drop,tier-drop,gate-regression',
+    ]);
+    expect(regressed.code).not.toBe(0);
+    expect(regressed.stderr).toMatch(/regression/i);
+
+    const clean = await runCliAllowFailure([
+      'diff',
+      securePath,
+      securePath,
+      '--fail-on',
+      'score-drop,tier-drop,gate-regression',
+    ]);
+    expect(clean.code).toBe(0);
+  });
+
+  it('prints category coverage in the scan summary line', async () => {
+    const outDir = path.join(outRoot, 'summary-line');
+    const result = await runCli([
+      'scan',
+      '--source',
+      'fixtures/lockfiles/pnpm-project',
+      '--out',
+      outDir,
+    ]);
+
+    expect(result.stdout).toMatch(
+      /readiness \d+\/100 \(\d+ of \d+ categories measured\)/
+    );
+  });
+
+  it('reports a friendly error for a nonexistent source path', async () => {
+    const result = await runCliAllowFailure([
+      'scan',
+      '--source',
+      '/no/such/dir-qq123',
+      '--out',
+      path.join(outRoot, 'no-source'),
+    ]);
+
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/source path .*does not exist/i);
+    expect(result.stderr).not.toContain('ENOENT');
+  });
+
   it('rejects malformed diff input artifacts', async () => {
     const validPath = path.join(outRoot, 'secure/ars.json');
     const invalidPath = path.join(outRoot, 'invalid-ars.json');

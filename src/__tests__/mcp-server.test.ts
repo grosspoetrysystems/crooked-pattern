@@ -89,6 +89,49 @@ describe('ars MCP server', () => {
     );
   });
 
+  it('surfaces top recommendations and tier blockers for LLM callers', async () => {
+    const outDir = path.join(outRoot, 'recommendations-scan');
+    const result = await client.callTool({
+      name: 'scan_site',
+      arguments: {
+        source: path.join(root, 'fixtures/lockfiles/pnpm-project'),
+        out: outDir,
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const structured = result.structuredContent as {
+      top_recommendations: {
+        id: string;
+        title: string;
+        result: string;
+        weight: number;
+        note: string;
+      }[];
+      gate_blockers?: {
+        gate: string;
+        requirements: { id: string; outcome: string; check_ids: string[] }[];
+      };
+    };
+
+    expect(structured.top_recommendations.length).toBeGreaterThan(0);
+    expect(structured.top_recommendations.length).toBeLessThanOrEqual(3);
+    const [first] = structured.top_recommendations;
+    expect(first.id).toMatch(/^source\./);
+    expect(['fail', 'partial']).toContain(first.result);
+    expect(first.note.length).toBeGreaterThan(0);
+    const weights = structured.top_recommendations.map((rec) => rec.weight);
+    expect([...weights].sort((a, b) => b - a)).toEqual(weights);
+
+    // Source-only scan: T1 evidence is unmeasured, so the tier-blocking gate
+    // is T1 with unknown (not fabricated fail) requirements.
+    expect(structured.gate_blockers?.gate).toBe('T1 Crawlable');
+    expect(structured.gate_blockers?.requirements[0]?.outcome).toBe('unknown');
+    expect(
+      structured.gate_blockers?.requirements[0]?.check_ids.length
+    ).toBeGreaterThan(0);
+  });
+
   it('returns a tool error when neither source nor url is provided', async () => {
     const result = await client.callTool({
       name: 'scan_site',

@@ -20,21 +20,31 @@ program
   .option('--url <url>', 'live URL for wire checks')
   .option(
     '--rendered',
-    'use an optional Playwright rendered DOM adapter for wire checks'
+    'use the optional rendered DOM adapter for wire checks (requires Playwright to be installed separately)'
   )
   .option(
     '--osv-report <file>',
-    'normalized OSV scan report JSON consumed as source evidence'
+    'OSV evidence: contract JSON or raw `osv-scanner --format json` output'
   )
   .option(
     '--socket-report <file>',
-    'normalized Socket scan report JSON consumed as source evidence'
+    'Socket evidence: contract JSON or Socket facts JSON'
   )
   .option(
     '--semgrep-report <file>',
-    'normalized Semgrep scan report JSON consumed as source evidence'
+    'Semgrep evidence: contract JSON or raw `semgrep --json` output'
   )
-  .option('--out <dir>', 'output directory', '.')
+  .option('--out <dir>', 'output directory for ars.json and ars-report.md', '.')
+  .addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  ars scan --url https://your-site.com --out ./ars-out',
+      '  ars scan --source . --out ./ars-out',
+      '  ars scan --source . --url https://your-site.com --osv-report osv.json --out ./ars-out',
+    ].join('\n')
+  )
   .action(
     async (opts: {
       source?: string;
@@ -58,19 +68,56 @@ program
         out: opts.out,
       });
       console.log(
-        `ARS final ${artifact.summary.ars_final}/100; readiness ${artifact.summary.ars_readiness}/100; tier ${artifact.summary.tier}`
+        `ARS final ${artifact.summary.ars_final}/100; readiness ${artifact.summary.ars_readiness}/100 (${artifact.summary.measured_categories} of ${artifact.summary.total_categories} categories measured); tier ${artifact.summary.tier}`
       );
       console.log(`Wrote ${jsonPath} and ${reportPath}`);
     }
   );
+
+const FAIL_ON_CONDITIONS = [
+  'score-drop',
+  'tier-drop',
+  'gate-regression',
+] as const;
+type FailOnCondition = (typeof FAIL_ON_CONDITIONS)[number];
 
 program
   .command('diff')
   .description('Compare two ars.json artifacts')
   .argument('<before>')
   .argument('<after>')
-  .action(async (before: string, after: string) => {
-    console.log(await diffArtifacts(before, after));
+  .option(
+    '--fail-on <conditions>',
+    `exit non-zero on regressions (comma-separated): ${FAIL_ON_CONDITIONS.join(', ')}`
+  )
+  .addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  ars diff baseline/ars.json current/ars.json',
+      '  ars diff baseline/ars.json current/ars.json --fail-on tier-drop,gate-regression',
+    ].join('\n')
+  )
+  .action(async (before: string, after: string, opts: { failOn?: string }) => {
+    const outcome = await diffArtifacts(before, after);
+    console.log(outcome.text);
+    if (!opts.failOn) return;
+    const conditions = opts.failOn.split(',').map((entry) => entry.trim());
+    const unknown = conditions.filter(
+      (entry) => !FAIL_ON_CONDITIONS.includes(entry as FailOnCondition)
+    );
+    if (unknown.length)
+      throw new Error(
+        `Unknown --fail-on condition(s): ${unknown.join(', ')}. Supported: ${FAIL_ON_CONDITIONS.join(', ')}.`
+      );
+    const triggered = conditions.filter((condition) => {
+      if (condition === 'score-drop') return outcome.regression.score_drop;
+      if (condition === 'tier-drop') return outcome.regression.tier_drop;
+      return outcome.regression.gate_regression;
+    });
+    if (triggered.length)
+      throw new Error(`Regression detected: ${triggered.join(', ')}.`);
   });
 
 async function loadSupplyChainInput(opts: {

@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { check } from '../checks.js';
 import { reconcileChecks } from '../reconcile.js';
@@ -32,10 +33,24 @@ describe('check registry', () => {
   });
 
   it('keeps emitted source, wire, and reconciliation checks traceable to registry entries', async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/html' });
+      response.end('<html><body><h1>registry fixture</h1></body></html>');
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const address = server.address();
+    if (!address || typeof address === 'string')
+      throw new Error('Could not bind fixture server.');
+
     const checks: CheckResult[] = [
       ...(await runSourcePass(process.cwd())),
-      ...(await runWirePass('http://127.0.0.1:9')),
+      ...(await runWirePass(`http://127.0.0.1:${address.port}`)),
     ];
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
     reconcileChecks(checks);
 
     expect(checks.length).toBeGreaterThan(0);

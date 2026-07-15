@@ -95,9 +95,9 @@ describe('ARS artifact validation', () => {
     const afterPath = path.join(tempDir, 'current.json');
     await writeArtifact(beforePath, legacy);
     await writeArtifact(afterPath, validArtifact());
-    await expect(diffArtifacts(beforePath, afterPath)).resolves.toContain(
-      '# ARS Diff'
-    );
+    await expect(
+      diffArtifacts(beforePath, afterPath).then((outcome) => outcome.text)
+    ).resolves.toContain('# ARS Diff');
   });
 
   it('rejects malformed gate outcomes and non-tier gates', () => {
@@ -217,8 +217,8 @@ describe('ARS artifact validation', () => {
         'summary.categories.crawl_access must be an object',
         'summary.categories.content_legibility.score must be omitted for unassessed categories',
         'summary.categories.trust_freshness.result has unsupported value "sometimes"',
-        'summary.safety.build_time_supply_chain must be a finite number between 0 and 100',
-        'summary.safety.runtime_agent_interaction must be a finite number between 0 and 100',
+        'summary.safety.build_time_supply_chain must be a finite number between 0 and 100, or null when unmeasured',
+        'summary.safety.runtime_agent_interaction must be a finite number between 0 and 100, or null when unmeasured',
       ])
     );
 
@@ -387,9 +387,9 @@ describe('ARS artifact validation', () => {
     await writeArtifact(beforePath, validArtifact());
     await writeArtifact(afterPath, validArtifact(60));
 
-    await expect(diffArtifacts(beforePath, afterPath)).resolves.toContain(
-      '# ARS Diff'
-    );
+    await expect(
+      diffArtifacts(beforePath, afterPath).then((outcome) => outcome.text)
+    ).resolves.toContain('# ARS Diff');
   });
 });
 

@@ -1,10 +1,37 @@
 import { readArsArtifact } from './validation.js';
 
-export async function diffArtifacts(beforePath: string, afterPath: string) {
+/** @public regression signals for CI gating via `ars diff --fail-on` */
+export interface DiffRegression {
+  score_drop: boolean;
+  tier_drop: boolean;
+  gate_regression: boolean;
+}
+
+interface DiffOutcome {
+  text: string;
+  regression: DiffRegression;
+}
+
+const TIER_ORDER = [
+  'T0 Unassessed',
+  'T1 Crawlable',
+  'T2 Legible',
+  'T3 Structured',
+  'T4 Operable',
+  'T5 Agent-Native',
+];
+
+export async function diffArtifacts(
+  beforePath: string,
+  afterPath: string
+): Promise<DiffOutcome> {
   const before = await readArsArtifact(beforePath);
   const after = await readArsArtifact(afterPath);
   const lines = [
     '# ARS Diff',
+    '',
+    `- Before: ${beforePath}`,
+    `- After: ${afterPath}`,
     '',
     `- ARS final: ${before.summary.ars_final} -> ${after.summary.ars_final} (${delta(after.summary.ars_final - before.summary.ars_final)})`,
     `- ARS readiness: ${before.summary.ars_readiness} -> ${after.summary.ars_readiness} (${delta(after.summary.ars_readiness - before.summary.ars_readiness)})`,
@@ -30,15 +57,42 @@ export async function diffArtifacts(beforePath: string, afterPath: string) {
   }
   lines.push('', '## Checks', '');
   const beforeChecks = new Map(before.checks.map((check) => [check.id, check]));
+  const afterIds = new Set(after.checks.map((check) => check.id));
+  const checkLines: string[] = [];
   for (const check of after.checks) {
     const old = beforeChecks.get(check.id);
     if (!old || old.score !== check.score || old.result !== check.result) {
-      lines.push(
+      checkLines.push(
         `- ${check.id}: ${old?.result ?? 'missing'} ${old?.score ?? 0} -> ${check.result} ${check.score} (${delta(check.score - (old?.score ?? 0))})`
       );
     }
   }
-  return lines.join('\n');
+  for (const check of before.checks) {
+    if (!afterIds.has(check.id)) {
+      checkLines.push(
+        `- ${check.id}: ${check.result} ${check.score} -> missing (check absent from the after artifact)`
+      );
+    }
+  }
+  lines.push(...(checkLines.length ? checkLines : ['No check changes.']));
+
+  const beforeGateOutcomes = new Map(
+    (before.summary.gates ?? []).map((gate) => [gate.gate, gate.outcome])
+  );
+  const gateRegression = (after.summary.gates ?? []).some(
+    (gate) =>
+      beforeGateOutcomes.get(gate.gate) === 'pass' && gate.outcome !== 'pass'
+  );
+  return {
+    text: lines.join('\n'),
+    regression: {
+      score_drop: after.summary.ars_final < before.summary.ars_final,
+      tier_drop:
+        TIER_ORDER.indexOf(after.summary.tier) <
+        TIER_ORDER.indexOf(before.summary.tier),
+      gate_regression: gateRegression,
+    },
+  };
 }
 
 function gateLines(

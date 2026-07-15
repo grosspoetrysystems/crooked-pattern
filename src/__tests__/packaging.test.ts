@@ -70,4 +70,23 @@ describe('package tarball allowlists', () => {
     ).toBe(main.version);
     expect((wrapper.bin as Record<string, string>)['ars-mcp']).toBeDefined();
   });
+
+  it('keeps the CLI and MCP server versions in lockstep with package.json', async () => {
+    const main = JSON.parse(
+      await readFile(path.join(root, 'package.json'), 'utf8')
+    ) as { version: string };
+
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [path.join(root, 'dist/cli.js'), '--version'],
+      { cwd: root }
+    );
+    expect(stdout.trim()).toBe(main.version);
+
+    const serverSource = await readFile(
+      path.join(root, 'src/mcp/server.ts'),
+      'utf8'
+    );
+    expect(serverSource).toContain(`version: '${main.version}'`);
+  }, 30_000);
 });
