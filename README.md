@@ -1,6 +1,6 @@
-# ARS
+# crooked-pattern
 
-Agentic Readiness Score is a CLI scaffold for scoring source and wire signals for agent readiness and unsafe exposure.
+crooked-pattern is a CLI scaffold that computes the Agentic Readiness Score (ARS) by scoring source and wire signals for agent readiness and unsafe exposure. The npm package is `crooked-pattern`; the installed CLI command is `ars` and the MCP stdio server bin is `ars-mcp` (at release the MCP server is also installable via the `crooked-pattern-mcp` wrapper package).
 
 ```sh
 pnpm install
@@ -75,3 +75,7 @@ Security scanners are integrated as adapter output contracts, not as executed to
 - `source.semgrep_findings` consumes a normalized `SemgrepScanReport`.
 
 Each contract accepts either a pre-generated report object or a `SupplyChainAdapter` implementation via `runSourcePass(root, { supplyChain })`; adapters receive the scan root and the parsed lockfile inventory. The CLI can ingest pre-generated normalized reports from disk with `--osv-report <file>`, `--socket-report <file>`, and `--semgrep-report <file>`. When no report or adapter is provided — the default — these checks stay `unknown` with `adapter_missing` metadata: ordinary scans never run scanners, never require the network, and never fabricate a pass or fail from missing evidence.
+
+## Related work
+
+Netlify's [AXIS](https://github.com/netlify/axis) (Agent Experience Index Score) is a related effort that measures the agent experience of websites by running a real agent against a live endpoint and grading the resulting transcripts. crooked-pattern and ARS were developed independently: the checks, categories, and maturity gates here are defined solely by this project's own rubric registry, and no AXIS taxonomy, dimensions, or versions are referenced.

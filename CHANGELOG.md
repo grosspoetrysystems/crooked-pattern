@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add a Related Work section to the README acknowledging Netlify's AXIS as an independent related effort, and align README naming with the `crooked-pattern` package (CLI command stays `ars`, MCP bin stays `ars-mcp`).
 - Rename the package to `crooked-pattern` (the score stays ARS; bins stay `ars`/`ars-mcp`) and freeze v0.1 launch scope in `docs/scope-freeze-v0.1.md`: npm identity (`crooked-pattern` + planned `crooked-pattern-mcp` wrapper), a machine-checkable Rule-of-Two v0.1 definition over MCP tool schemas, stdio-default/SSE-opt-in transport scope, and the binding `docs/release-checklist-v0.1.md`.
 - Raise test coverage above all configured thresholds (branch coverage 71% → 86%) with wire-check branch tests against a signal-rich fixture server and validation error-path tests; thresholds unchanged.
 - Package the scanner as an MCP stdio server (`ars-mcp`) exposing `scan_site` via the official MCP TypeScript SDK; `mcp/server-card.json` is now the real authored contract, kept consistent with the runtime by tests, and source/wire reconciliation is exercised against the live surface. CLI and MCP share one scan pipeline.
