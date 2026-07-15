@@ -128,9 +128,3 @@ pnpm ars scan --source . --url https://example.com --out out
 pnpm verify   # typecheck, lint, tests, build, smoke, dead-code check
 pnpm coverage
 ```
-
-## Related work
-
-crooked-pattern takes its shape from [Lighthouse](https://github.com/GoogleChrome/lighthouse): a weighted set of categorized audits that produce a 0–100 score and an actionable report you can run in CI on every change — here applied to agent-readiness and supply-chain safety instead of web performance.
-
-Netlify's [AXIS](https://github.com/netlify/axis) (Agent Experience Index Score) is the behavioral counterpart in this space: it runs a real coding agent through scripted scenarios and grades the transcripts. The two are complementary — AXIS measures what an agent actually accomplishes, while crooked-pattern is a deterministic, static pre-flight that scores the signals and safety posture an agent would encounter. Reach for AXIS to evaluate outcomes; reach for crooked-pattern for a fast, reproducible gate.
