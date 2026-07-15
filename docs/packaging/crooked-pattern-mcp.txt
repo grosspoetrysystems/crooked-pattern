@@ -1,0 +1,5 @@
+# Committed tarball allowlist for `crooked-pattern-mcp` (npm pack --dry-run).
+LICENSE
+README.md
+bin.js
+package.json

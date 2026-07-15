@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an opt-in streamable HTTP/SSE transport to `ars-mcp` behind `--transport sse` (`--port`, default 3339, loopback bind, endpoint `/mcp`); stdio stays the no-flag default and nothing enables the network transport implicitly. Package both artifacts for release: MIT license, `files` allowlists verified against committed tarball allowlists in `docs/packaging/`, and a thin `crooked-pattern-mcp` wrapper package exposing the MCP bin for `npx` MCP-client configs.
+
 - Deepen supply-chain and runtime-safety evidence: ingest raw scanner outputs (osv-scanner `--format json`, semgrep `--json`, Socket facts JSON) in addition to normalized contract reports; replace the HTML-keyword Rule-of-Two heuristic with the v0.1 machine-checkable predicate over declared MCP tool schemas (versioned U/P/X lexicon in the registry; `unknown` when no tool schemas are discoverable; single-tool and toolset violations with named evidence; machine-readable `session_isolation` honored); detect non-Node ecosystems (python/go/rust/ruby/php/jvm/dotnet) as presence-level pinning evidence via `source.ecosystem_presence`.
 - Add a Related Work section to the README acknowledging Netlify's AXIS as an independent related effort, and align README naming with the `crooked-pattern` package (CLI command stays `ars`, MCP bin stays `ars-mcp`).
 - Rename the package to `crooked-pattern` (the score stays ARS; bins stay `ars`/`ars-mcp`) and freeze v0.1 launch scope in `docs/scope-freeze-v0.1.md`: npm identity (`crooked-pattern` + planned `crooked-pattern-mcp` wrapper), a machine-checkable Rule-of-Two v0.1 definition over MCP tool schemas, stdio-default/SSE-opt-in transport scope, and the binding `docs/release-checklist-v0.1.md`.
