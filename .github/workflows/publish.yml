@@ -1,35 +1,30 @@
 name: publish
 
-# Publishes on a version tag push (e.g. `git tag v0.1.2 && git push origin v0.1.2`).
+# Publishes on a version tag push (e.g. `git tag v0.1.3 && git push origin v0.1.3`).
 on:
   push:
     tags:
       - 'v*'
 
-# OIDC trusted publishing: no NPM_TOKEN secret, no interactive 2FA.
-# `id-token: write` lets npm mint a short-lived token and generate provenance.
+# Default for all jobs: read-only. The publish job below escalates to id-token.
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  publish:
+  # Build runs all third-party code (dependency install scripts, the build)
+  # but has NO id-token, so a compromised build dependency cannot mint a
+  # publish credential. Its only output is the built dist/ artifact.
+  build:
     runs-on: ubuntu-latest
-    # A tag push does not publish on its own: this job pauses here until a
-    # required reviewer approves the `release` environment. That restores the
-    # deliberate human gate at publish time — no stored token, provenance on
-    # every release, and nothing ships without an explicit approval.
-    environment: release
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
       - run: pnpm install --frozen-lockfile
 
-      # Refuse to publish if the tag and the package version disagree.
+      # Refuse to build/publish if the tag and the package version disagree.
       - name: Verify tag matches package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
@@ -39,12 +34,40 @@ jobs:
             exit 1
           fi
 
-      # Full quality gate (typecheck, lint, tests, build, smoke, dead-code)
-      # runs against the exact tagged commit before anything is published.
       - run: pnpm verify
+      - run: pnpm coverage
 
+      - name: Upload built dist
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # Publish holds the OIDC id-token but runs no third-party code: it only
+  # checks out our own source, pulls in the prebuilt dist/, and publishes.
+  # A tag push pauses here for a required reviewer to approve `release`.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment: release
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
       # Trusted publishing requires npm >= 11.5.1; guarantee a current npm.
       - run: npm install -g npm@latest
+
+      - name: Download built dist
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
 
       # Publish the main package first — the wrapper pins it as a dependency.
       # Provenance is generated automatically under OIDC; --provenance is explicit.

@@ -32,7 +32,12 @@ git push origin master
 git push origin vX.Y.Z          # this triggers publish.yml
 ```
 
-The workflow: checks out the tag, installs frozen deps, verifies the tag matches the package version, runs `pnpm verify`, then **pauses for approval** at the `release` environment. Approve it (Actions run → "Review deployments") and it publishes both packages with provenance over OIDC.
+The workflow runs in two isolated jobs:
+
+- **build** installs dependencies, checks the tag matches the package version, runs the full `pnpm verify` + `pnpm coverage` gate, and uploads the built `dist/` as an artifact. This job runs all third-party code (dependency install scripts, the build) but has **no** `id-token` — so a compromised build dependency has no publish credential to steal or use.
+- **publish** holds the OIDC `id-token` but runs no third-party code: it checks out our own source, pulls in the prebuilt `dist/`, and **pauses for approval** at the `release` environment. Approve it (Actions run → "Review deployments") and it publishes both packages with provenance over OIDC from the prebuilt artifact.
+
+All Actions are pinned to commit SHAs (Dependabot keeps them current), so a moved or compromised action tag cannot change what runs.
 
 ### Gotcha: the workflow must exist at the tagged commit
 
