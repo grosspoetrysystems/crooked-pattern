@@ -65,9 +65,9 @@ describe('package tarball allowlists', () => {
     // A bin matching the package's unscoped name lets `npx <pkg> <args>`
     // resolve an executable; without it npx errors on a multi-bin package.
     expect((main.bin as Record<string, string>)['crooked-pattern']).toBe(
-      './dist/cli.js'
+      'dist/cli.js'
     );
-    expect((main.bin as Record<string, string>).ars).toBe('./dist/cli.js');
+    expect((main.bin as Record<string, string>).ars).toBe('dist/cli.js');
     expect((main.publishConfig as Record<string, string>)?.access).toBe(
       'public'
     );

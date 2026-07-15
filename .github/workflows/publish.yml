@@ -48,9 +48,23 @@ jobs:
 
       # Publish the main package first — the wrapper pins it as a dependency.
       # Provenance is generated automatically under OIDC; --provenance is explicit.
+      # Each step is idempotent: an already-published version is skipped rather
+      # than erroring, so a partial-failure re-run finishes the release.
       - name: Publish @grosspoetrysystems/crooked-pattern
-        run: npm publish --provenance --access public
+        run: |
+          VER="$(node -p "require('./package.json').version")"
+          if npm view "@grosspoetrysystems/crooked-pattern@${VER}" version >/dev/null 2>&1; then
+            echo "@grosspoetrysystems/crooked-pattern@${VER} already published — skipping."
+          else
+            npm publish --provenance --access public --ignore-scripts
+          fi
 
       - name: Publish @grosspoetrysystems/crooked-pattern-mcp
-        run: npm publish --provenance --access public
         working-directory: packages/crooked-pattern-mcp
+        run: |
+          VER="$(node -p "require('./package.json').version")"
+          if npm view "@grosspoetrysystems/crooked-pattern-mcp@${VER}" version >/dev/null 2>&1; then
+            echo "@grosspoetrysystems/crooked-pattern-mcp@${VER} already published — skipping."
+          else
+            npm publish --provenance --access public --ignore-scripts
+          fi

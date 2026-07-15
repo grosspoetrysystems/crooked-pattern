@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-07-16
+
+- Normalize `bin` paths (`dist/cli.js` instead of `./dist/cli.js`) to stop npm's publish-time "auto-corrected" warning. No behavior change — the commands are unchanged.
+- Publish the `@grosspoetrysystems/crooked-pattern-mcp` wrapper at version parity with the main package (a partial CI publish had left it at 0.1.0).
+- Release workflow: publish steps are now idempotent (an already-published version is skipped), so a partial-failure re-run completes the release instead of erroring.
+
 ## 0.1.1 — 2026-07-15
 
 - Add a `crooked-pattern` bin alias (alongside `ars`) so `npx @grosspoetrysystems/crooked-pattern scan …` resolves an executable. Without it, npx cannot pick a bin on a multi-bin scoped package and errors with "could not determine executable to run"; the documented quickstart now works as written. `ars` remains the primary command; `ars-mcp` is unchanged.

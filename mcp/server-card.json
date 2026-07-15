@@ -1,6 +1,6 @@
 {
   "name": "ars",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Agentic Readiness Score scanner. Exposes scan_site over MCP stdio via the ars-mcp binary (dist/mcp.js).",
   "transport": "stdio",
   "run": "ars-mcp",
