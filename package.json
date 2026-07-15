@@ -1,8 +1,11 @@
 {
-  "name": "crooked-pattern",
+  "name": "@grosspoetrysystems/crooked-pattern",
   "version": "0.1.0",
-  "description": "Crooked Pattern — Agentic Readiness Score (ARS) scanner, CLI + MCP server",
+  "description": "Crooked Pattern \u2014 Agentic Readiness Score (ARS) scanner, CLI + MCP server",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "agentic-readiness",
     "ars",
@@ -58,5 +61,14 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "author": "Gross Poetry Systems",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grosspoetrysystems/crooked-pattern.git"
+  },
+  "homepage": "https://github.com/grosspoetrysystems/crooked-pattern#readme",
+  "bugs": {
+    "url": "https://github.com/grosspoetrysystems/crooked-pattern/issues"
   }
 }

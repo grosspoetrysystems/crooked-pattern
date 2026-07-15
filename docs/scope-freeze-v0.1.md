@@ -4,10 +4,14 @@ Product-owner decisions frozen 2026-07-15 (Wave 0, plan `plan_3932ss6giwt0` v3/d
 
 ## D1 — npm package identity
 
-- Main package: **`crooked-pattern`** (unscoped; verified available on the public registry 2026-07-15; bare `ars` is taken by an unrelated package). The project is called Crooked Pattern; ARS — the Agentic Readiness Score — is the score it produces.
-- MCP wrapper package: **`crooked-pattern-mcp`** (unscoped; verified available 2026-07-15). A thin package that depends on `crooked-pattern` and re-exposes the MCP server bin so MCP client configs can use `npx crooked-pattern-mcp`.
+**Amended 2026-07-15 (release gate):** scoped under the studio's npm org so the org is the owner/publisher of record and the studio stands on its own (product-owner aesthetic decision; `thekidnamedkd` is org owner behind the scenes). Original decision below chose unscoped names — superseded by the scoped names.
+
+- Main package: **`@grosspoetrysystems/crooked-pattern`** (scoped; org `grosspoetrysystems` confirmed on npm 2026-07-15, scoped name verified available). The project is called Crooked Pattern; ARS — the Agentic Readiness Score — is the score it produces.
+- MCP wrapper package: **`@grosspoetrysystems/crooked-pattern-mcp`** (scoped; verified available 2026-07-15). A thin package that depends on `@grosspoetrysystems/crooked-pattern` and re-exposes the MCP server bin so MCP client configs can use `npx @grosspoetrysystems/crooked-pattern-mcp`.
 - Installed command names are unchanged: `ars` (CLI) and `ars-mcp` (MCP stdio server).
-- Both packages publish at `0.1.0` with public access.
+- Both packages publish at `0.1.0` with `publishConfig.access = public` (required for scoped public packages).
+- Attribution: `author` "Gross Poetry Systems"; MIT license © Gross Poetry Systems; repository/homepage/bugs point at `github.com/grosspoetrysystems/crooked-pattern` (public).
+- Superseded original: unscoped `crooked-pattern` / `crooked-pattern-mcp` (bare `ars` was taken; scoped chosen for studio ownership instead).
 
 ## D2 — Rule-of-Two v0.1 (measurable definition)
 

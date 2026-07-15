@@ -23,7 +23,7 @@ Binding gate for publishing `crooked-pattern` and `crooked-pattern-mcp` (see `do
 
 ## Packaging
 
-- [ ] `package.json` names match the scope freeze: `crooked-pattern` (main), `crooked-pattern-mcp` (wrapper)
+- [ ] `package.json` names match the amended scope freeze: `@grosspoetrysystems/crooked-pattern` (main), `@grosspoetrysystems/crooked-pattern-mcp` (wrapper); both carry `publishConfig.access = public`
 - [ ] Both packages carry `license`, `repository`, `description`, and `files` (or equivalent) metadata
 - [ ] `npm pack --dry-run` tarball contents match the committed allowlist for both packages — no test fixtures, coverage artifacts, lifecycle docs, or worktree metadata
 - [ ] `ars --help` and `ars-mcp` bins resolve and run from a packed tarball install (`npm i -g <tarball>` smoke test)
@@ -38,5 +38,5 @@ Binding gate for publishing `crooked-pattern` and `crooked-pattern-mcp` (see `do
 
 ## Post-publish verification
 
-- [ ] `npm info crooked-pattern@0.1.0` and `npm info crooked-pattern-mcp@0.1.0` resolve
-- [ ] `npx crooked-pattern@0.1.0 --help` and `npx crooked-pattern-mcp@0.1.0` (stdio handshake) work from a clean environment
+- [ ] `npm info @grosspoetrysystems/crooked-pattern@0.1.0` and `npm info @grosspoetrysystems/crooked-pattern-mcp@0.1.0` resolve
+- [ ] `npx @grosspoetrysystems/crooked-pattern@0.1.0 --help` and `npx @grosspoetrysystems/crooked-pattern-mcp@0.1.0` (stdio handshake) work from a clean environment

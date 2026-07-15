@@ -7,7 +7,7 @@ It is a pre-flight lint for the agentic web: it measures the presence, coherence
 ## Quick start
 
 ```sh
-npx crooked-pattern scan --url https://your-site.com --out ./ars-out
+npx @grosspoetrysystems/crooked-pattern scan --url https://your-site.com --out ./ars-out
 # ARS final 72/100; readiness 84/100 (6 of 6 categories measured); tier T3 Structured
 # Wrote ars-out/ars.json and ars-out/ars-report.md
 ```
@@ -15,7 +15,7 @@ npx crooked-pattern scan --url https://your-site.com --out ./ars-out
 Or install globally — the command is `ars`:
 
 ```sh
-npm i -g crooked-pattern
+npm i -g @grosspoetrysystems/crooked-pattern
 ars scan --source . --url https://your-site.com --out ./ars-out
 ars diff baseline/ars.json ars-out/ars.json
 ```
@@ -81,20 +81,20 @@ Playwright, axe-core, OSV-Scanner, Socket, and Semgrep stay behind explicit exte
 
 ## MCP server
 
-The scanner is also an MCP server exposing a `scan_site` tool whose inputs mirror `ars scan` (`source`, `url`, `rendered`, `out`) and whose structured output includes the score summary, the highest-impact recommendations, and the requirements blocking the next tier. Add it to an MCP client via the `crooked-pattern-mcp` wrapper package:
+The scanner is also an MCP server exposing a `scan_site` tool whose inputs mirror `ars scan` (`source`, `url`, `rendered`, `out`) and whose structured output includes the score summary, the highest-impact recommendations, and the requirements blocking the next tier. Add it to an MCP client via the `@grosspoetrysystems/crooked-pattern-mcp` wrapper package:
 
 ```json
 {
   "mcpServers": {
     "ars": {
       "command": "npx",
-      "args": ["-y", "crooked-pattern-mcp"]
+      "args": ["-y", "@grosspoetrysystems/crooked-pattern-mcp"]
     }
   }
 }
 ```
 
-Or with the Claude Code CLI: `claude mcp add ars -- npx -y crooked-pattern-mcp`.
+Or with the Claude Code CLI: `claude mcp add ars -- npx -y @grosspoetrysystems/crooked-pattern-mcp`.
 
 Stdio is the only transport enabled by default. A streamable HTTP/SSE binding is opt-in behind an explicit flag and binds loopback:
 

@@ -1,8 +1,11 @@
 {
-  "name": "crooked-pattern-mcp",
+  "name": "@grosspoetrysystems/crooked-pattern-mcp",
   "version": "0.1.0",
-  "description": "MCP server for Crooked Pattern (Agentic Readiness Score) — thin wrapper so MCP client configs can run `npx crooked-pattern-mcp`",
+  "description": "MCP server for Crooked Pattern (Agentic Readiness Score) \u2014 thin wrapper so MCP client configs can run `npx @grosspoetrysystems/crooked-pattern-mcp`",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": ["mcp", "model-context-protocol", "agentic-readiness", "ars"],
   "type": "module",
   "bin": {
@@ -11,9 +14,19 @@
   },
   "files": ["bin.js"],
   "dependencies": {
-    "crooked-pattern": "0.1.0"
+    "@grosspoetrysystems/crooked-pattern": "0.1.0"
   },
   "engines": {
     "node": ">=20"
+  },
+  "author": "Gross Poetry Systems",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grosspoetrysystems/crooked-pattern.git",
+    "directory": "packages/crooked-pattern-mcp"
+  },
+  "homepage": "https://github.com/grosspoetrysystems/crooked-pattern#readme",
+  "bugs": {
+    "url": "https://github.com/grosspoetrysystems/crooked-pattern/issues"
   }
 }

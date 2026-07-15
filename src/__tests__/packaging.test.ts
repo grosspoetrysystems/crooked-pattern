@@ -59,16 +59,24 @@ describe('package tarball allowlists', () => {
       )
     ) as Record<string, unknown>;
 
-    expect(main.name).toBe('crooked-pattern');
+    expect(main.name).toBe('@grosspoetrysystems/crooked-pattern');
     expect(main.license).toBe('MIT');
     expect(main.files).toBeDefined();
-    expect(wrapper.name).toBe('crooked-pattern-mcp');
+    expect((main.publishConfig as Record<string, string>)?.access).toBe(
+      'public'
+    );
+    expect(wrapper.name).toBe('@grosspoetrysystems/crooked-pattern-mcp');
     expect(wrapper.license).toBe('MIT');
     expect(wrapper.version).toBe(main.version);
     expect(
-      (wrapper.dependencies as Record<string, string>)['crooked-pattern']
+      (wrapper.dependencies as Record<string, string>)[
+        '@grosspoetrysystems/crooked-pattern'
+      ]
     ).toBe(main.version);
     expect((wrapper.bin as Record<string, string>)['ars-mcp']).toBeDefined();
+    expect((wrapper.publishConfig as Record<string, string>)?.access).toBe(
+      'public'
+    );
   });
 
   it('keeps the CLI and MCP server versions in lockstep with package.json', async () => {
