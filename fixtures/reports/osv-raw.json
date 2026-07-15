@@ -1,0 +1,47 @@
+{
+  "results": [
+    {
+      "source": { "path": "/scan/pnpm-lock.yaml", "type": "lockfile" },
+      "packages": [
+        {
+          "package": {
+            "name": "tiny-dep",
+            "version": "1.0.3",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [
+            {
+              "schema_version": "1.6.0",
+              "id": "GHSA-aaaa-bbbb-cccc",
+              "aliases": ["CVE-2025-0001"],
+              "summary": "Prototype pollution in tiny-dep",
+              "severity": [
+                {
+                  "type": "CVSS_V3",
+                  "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+                }
+              ],
+              "database_specific": { "severity": "CRITICAL" }
+            }
+          ],
+          "groups": [{ "ids": ["GHSA-aaaa-bbbb-cccc"], "max_severity": "9.8" }]
+        },
+        {
+          "package": {
+            "name": "other-dep",
+            "version": "2.1.0",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [
+            {
+              "schema_version": "1.6.0",
+              "id": "GHSA-dddd-eeee-ffff",
+              "summary": "ReDoS in other-dep"
+            }
+          ],
+          "groups": [{ "ids": ["GHSA-dddd-eeee-ffff"], "max_severity": "5.3" }]
+        }
+      ]
+    }
+  ]
+}

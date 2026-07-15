@@ -270,6 +270,8 @@ export async function runSourcePass(
     semgrepCheck(semgrepReport)
   );
 
+  results.push(ecosystemPresenceCheck(files));
+
   const authoredToolEvidence = await detectAuthoredTools(root, files);
   results.push(
     check(
@@ -290,6 +292,85 @@ export async function runSourcePass(
   );
 
   return results;
+}
+
+// Presence-level detection of non-Node ecosystems: manifests prove the
+// ecosystem exists, lockfile-style files prove pinning. Deliberately not a
+// parsed inventory — depth is declared honestly via the 'partial' status.
+const ECOSYSTEM_SIGNATURES: readonly {
+  name: string;
+  manifests: string[];
+  lockfiles: string[];
+}[] = [
+  {
+    name: 'python',
+    manifests: ['pyproject.toml', 'requirements.txt', 'Pipfile', 'setup.py'],
+    lockfiles: ['poetry.lock', 'Pipfile.lock', 'uv.lock', 'pdm.lock'],
+  },
+  { name: 'go', manifests: ['go.mod'], lockfiles: ['go.sum'] },
+  { name: 'rust', manifests: ['Cargo.toml'], lockfiles: ['Cargo.lock'] },
+  { name: 'ruby', manifests: ['Gemfile'], lockfiles: ['Gemfile.lock'] },
+  { name: 'php', manifests: ['composer.json'], lockfiles: ['composer.lock'] },
+  {
+    name: 'jvm',
+    manifests: ['pom.xml', 'build.gradle', 'build.gradle.kts'],
+    lockfiles: ['gradle.lockfile'],
+  },
+  {
+    name: 'dotnet',
+    manifests: ['packages.config'],
+    lockfiles: ['packages.lock.json'],
+  },
+];
+
+function ecosystemPresenceCheck(files: Set<string>): CheckResult {
+  const detected = ECOSYSTEM_SIGNATURES.map((signature) => ({
+    name: signature.name,
+    manifests: signature.manifests.filter((file) => files.has(file)),
+    lockfiles: signature.lockfiles.filter((file) => files.has(file)),
+  })).filter((entry) => entry.manifests.length > 0);
+
+  if (!detected.length) {
+    return check(
+      'source.ecosystem_presence',
+      'non-Node ecosystem presence',
+      'supply_chain_safety',
+      'SOURCE_ONLY',
+      8,
+      'unknown',
+      0,
+      [
+        'No non-Node ecosystem manifests detected; Node dependencies are assessed by the lockfile checks.',
+      ]
+    );
+  }
+
+  const unpinned = detected.filter((entry) => entry.lockfiles.length === 0);
+  const result =
+    unpinned.length === 0
+      ? 'pass'
+      : unpinned.length < detected.length
+        ? 'partial'
+        : 'fail';
+  return check(
+    'source.ecosystem_presence',
+    'non-Node ecosystem presence',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    8,
+    result,
+    result === 'pass' ? 100 : result === 'partial' ? 50 : 0,
+    [
+      `Detected non-Node ecosystems: ${detected
+        .map(
+          (entry) =>
+            `${entry.name} (${entry.manifests.join(', ')}${entry.lockfiles.length ? `; pinned via ${entry.lockfiles.join(', ')}` : '; no pinning evidence'})`
+        )
+        .join('; ')}.`,
+      'Presence-level evidence only; dependency inventories are not parsed for these ecosystems.',
+    ],
+    { source_value: { ecosystems: detected } }
+  );
 }
 
 function osvCheck(report: OsvScanReport | undefined): CheckResult {

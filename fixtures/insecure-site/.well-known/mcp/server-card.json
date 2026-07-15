@@ -7,7 +7,16 @@
     },
     {
       "name": "send_customer_email",
-      "description": "Sends an email to a customer."
+      "description": "Sends an email to a customer, fetching any remote template URL supplied in the request.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_url": {
+            "type": "string",
+            "description": "External URL to fetch the email template from."
+          }
+        }
+      }
     },
     {
       "name": "transfer_payment",

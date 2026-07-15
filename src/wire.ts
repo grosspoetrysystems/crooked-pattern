@@ -11,6 +11,7 @@ import {
   parsedJsonLdBlocks,
   tagsNamed,
 } from './html.js';
+import { RULE_OF_TWO_LEXICON, type RuleOfTwoClass } from './registry.js';
 import type { CheckResult } from './types.js';
 
 interface Fetched {
@@ -24,6 +25,7 @@ interface ServerCard {
   tools?: unknown[];
   signature?: unknown;
   integrity?: unknown;
+  session_isolation?: unknown;
 }
 
 export async function runWirePass(
@@ -662,37 +664,7 @@ export async function runWirePass(
     )
   );
 
-  const exfil =
-    /fetch\(|webhook|email|send|postMessage|window\.open/i.test(html) ||
-    liveToolCount > 0;
-  const privateAccess =
-    /token|secret|account|profile|email|payment|customer/i.test(html);
-  const stateChange =
-    /delete|update|create|purchase|transfer|send/i.test(html) ||
-    liveToolCount > 0;
-  const trifecta = [exfil, privateAccess, stateChange].filter(Boolean).length;
-  results.push(
-    check(
-      'wire.rule_of_two',
-      'Rule-of-Two / lethal-trifecta posture',
-      'runtime_agent_safety',
-      'WIRE_ONLY',
-      35,
-      trifecta <= 2 ? 'pass' : 'fail',
-      trifecta <= 2 ? 100 : 0,
-      [
-        `Detected ${trifecta} of 3 risk classes (untrusted/exfil, sensitive access, state change). HTML keyword detection is heuristic until tool-schema analysis is implemented.`,
-      ],
-      {
-        wire_value: { exfil, privateAccess, stateChange },
-        metadata: {
-          confidence: 'heuristic',
-          status: 'partial',
-          labels: ['html-keywords'],
-        },
-      }
-    )
-  );
+  results.push(ruleOfTwoCheck(parsedServerCard));
   results.push(
     check(
       'wire.manifest_pinning',
@@ -920,6 +892,175 @@ function analyzeRenderedFields(
     total: fields.length,
     unlabeled: fields.filter((element) => !element.name?.trim()).length,
   };
+}
+
+type RuleOfTwoClasses = Partial<Record<RuleOfTwoClass, string[]>>;
+
+interface ToolClassification {
+  tool: string;
+  classes: RuleOfTwoClass[];
+  matched_terms: RuleOfTwoClasses;
+}
+
+// Rule-of-Two v0.1 (docs/scope-freeze-v0.1.md, D2): a machine-checkable
+// predicate over declared MCP tool schemas. Page HTML plays no part; absent
+// tool schemas yield unknown, never a fabricated pass/fail.
+function ruleOfTwoCheck(card: ServerCard | undefined): CheckResult {
+  const declaredTools = Array.isArray(card?.tools) ? card.tools : undefined;
+  if (!declaredTools) {
+    return check(
+      'wire.rule_of_two',
+      'Rule-of-Two / lethal-trifecta posture',
+      'runtime_agent_safety',
+      'WIRE_ONLY',
+      35,
+      'unknown',
+      0,
+      [
+        'No MCP tool schemas discoverable (no server card with a declared tools array); Rule-of-Two posture is not assessable.',
+      ],
+      { wire_value: { lexicon_version: RULE_OF_TWO_LEXICON.version } }
+    );
+  }
+
+  const classifications = declaredTools
+    .map((tool) => classifyDeclaredTool(tool))
+    .filter((entry): entry is ToolClassification => entry !== undefined);
+  const singleViolators = classifications.filter(
+    (entry) => entry.classes.length === 3
+  );
+  const union = new Set(classifications.flatMap((entry) => entry.classes));
+  const sessionIsolation = card?.session_isolation === true;
+  const toolsetSpan = union.size === 3 && !sessionIsolation;
+  const violation = singleViolators.length
+    ? 'single-tool'
+    : toolsetSpan
+      ? 'toolset'
+      : null;
+
+  const notes = ruleOfTwoNotes(
+    classifications,
+    singleViolators,
+    violation,
+    sessionIsolation,
+    union
+  );
+  return check(
+    'wire.rule_of_two',
+    'Rule-of-Two / lethal-trifecta posture',
+    'runtime_agent_safety',
+    'WIRE_ONLY',
+    35,
+    violation ? 'fail' : 'pass',
+    violation ? 0 : 100,
+    notes,
+    {
+      wire_value: {
+        lexicon_version: RULE_OF_TWO_LEXICON.version,
+        tool_classes: classifications,
+        violation,
+        session_isolation: sessionIsolation,
+      },
+    }
+  );
+}
+
+function ruleOfTwoNotes(
+  classifications: ToolClassification[],
+  singleViolators: ToolClassification[],
+  violation: 'single-tool' | 'toolset' | null,
+  sessionIsolation: boolean,
+  union: Set<RuleOfTwoClass>
+): string[] {
+  if (!classifications.length)
+    return ['Declared toolset is empty; no capability combination possible.'];
+  if (violation === 'single-tool')
+    return singleViolators.map(
+      (entry) =>
+        `Tool ${entry.tool} spans all three risk classes: ${describeMatches(entry.matched_terms)}.`
+    );
+  if (violation === 'toolset')
+    return [
+      `Declared toolset collectively spans untrusted content, private data, and side effects with no machine-readable session isolation: ${classifications
+        .filter((entry) => entry.classes.length > 0)
+        .map((entry) => `${entry.tool} (${entry.classes.join(', ')})`)
+        .join('; ')}.`,
+    ];
+  if (union.size === 3 && sessionIsolation)
+    return [
+      'Toolset spans all three risk classes, but the server card declares session isolation; no single session combines them.',
+    ];
+  return [
+    `No Rule-of-Two violation: ${classifications.length} declared tool(s) span ${union.size} of 3 risk classes.`,
+  ];
+}
+
+function describeMatches(matched: RuleOfTwoClasses): string {
+  return Object.entries(matched)
+    .map(([riskClass, terms]) => `${riskClass} (${terms.join(', ')})`)
+    .join(', ');
+}
+
+function classifyDeclaredTool(tool: unknown): ToolClassification | undefined {
+  const name =
+    typeof tool === 'string' ? tool : objectStringValue(tool, 'name');
+  if (typeof name !== 'string' || !name.trim()) return undefined;
+  const corpus = normalizeIdentifierText(
+    [
+      name,
+      objectStringValue(tool, 'description') ?? '',
+      ...schemaText(tool),
+    ].join(' ')
+  );
+  const matched: RuleOfTwoClasses = {};
+  const classes: RuleOfTwoClass[] = [];
+  for (const [riskClass, terms] of Object.entries(
+    RULE_OF_TWO_LEXICON.classes
+  ) as [RuleOfTwoClass, readonly string[]][]) {
+    const hits = terms.filter((term) =>
+      new RegExp(`\\b${escapeRegExp(term)}\\b`).test(corpus)
+    );
+    if (hits.length) {
+      matched[riskClass] = hits;
+      classes.push(riskClass);
+    }
+  }
+  return { tool: name.trim(), classes, matched_terms: matched };
+}
+
+// Collect property names and description strings from declared JSON schemas
+// (inputSchema/outputSchema/parameters), bounded to a small depth.
+function schemaText(tool: unknown, depth = 0): string[] {
+  if (depth > 6 || !tool || typeof tool !== 'object') return [];
+  const record = tool as Record<string, unknown>;
+  const out: string[] = [];
+  for (const key of ['inputSchema', 'outputSchema', 'parameters']) {
+    out.push(...schemaNodeText(record[key], depth + 1));
+  }
+  return out;
+}
+
+function schemaNodeText(node: unknown, depth: number): string[] {
+  if (depth > 6 || !node || typeof node !== 'object') return [];
+  const record = node as Record<string, unknown>;
+  const out: string[] = [];
+  if (typeof record.description === 'string') out.push(record.description);
+  const properties = record.properties;
+  if (properties && typeof properties === 'object') {
+    for (const [key, value] of Object.entries(properties)) {
+      out.push(key, ...schemaNodeText(value, depth + 1));
+    }
+  }
+  if (record.items) out.push(...schemaNodeText(record.items, depth + 1));
+  return out;
+}
+
+function normalizeIdentifierText(text: string): string {
+  return text.toLowerCase().replace(/[_\-./]+/g, ' ');
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function extractToolNames(parsed: ServerCard | undefined): string[] {

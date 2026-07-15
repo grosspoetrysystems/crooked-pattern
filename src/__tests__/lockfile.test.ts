@@ -11,6 +11,25 @@ function pkg(inventory: LockfileInventory | undefined, name: string) {
 }
 
 describe('readLockfileInventory', () => {
+  it('produces byte-identical inventories for identical lockfile input across runs', async () => {
+    const projects = [
+      'pnpm-project',
+      'npm-project',
+      'yarn-project',
+      'bun-project',
+    ];
+    for (const project of projects) {
+      const root = path.join(fixtures, project);
+      const runs = await Promise.all([
+        readLockfileInventory(root, ['tiny-dep', 'dev-tool']),
+        readLockfileInventory(root, ['tiny-dep', 'dev-tool']),
+        readLockfileInventory(root, ['tiny-dep', 'dev-tool']),
+      ]);
+      expect(JSON.stringify(runs[1]), project).toBe(JSON.stringify(runs[0]));
+      expect(JSON.stringify(runs[2]), project).toBe(JSON.stringify(runs[0]));
+    }
+  });
+
   it('parses a pnpm v9 lockfile into direct and transitive packages', async () => {
     const inventory = await readLockfileInventory(
       path.join(fixtures, 'pnpm-project'),

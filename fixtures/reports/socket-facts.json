@@ -1,0 +1,28 @@
+{
+  "components": [
+    {
+      "type": "file",
+      "name": "src/index.js",
+      "alerts": [
+        {
+          "type": "secret",
+          "severity": "high",
+          "message": "Hardcoded API key detected.",
+          "location": { "path": "src/index.js", "line": 12 }
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "Dockerfile",
+      "alerts": [
+        {
+          "type": "container",
+          "severity": "medium",
+          "message": "Container runs as root user.",
+          "location": { "path": "Dockerfile", "line": 1 }
+        }
+      ]
+    }
+  ]
+}
