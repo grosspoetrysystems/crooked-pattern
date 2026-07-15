@@ -2,11 +2,24 @@
   "name": "crooked-pattern",
   "version": "0.1.0",
   "description": "Crooked Pattern — Agentic Readiness Score (ARS) scanner, CLI + MCP server",
+  "license": "MIT",
+  "keywords": [
+    "agentic-readiness",
+    "ars",
+    "mcp",
+    "scanner",
+    "supply-chain",
+    "llms-txt"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.12.1",
+  "files": ["dist", "CHANGELOG.md"],
   "bin": {
     "ars": "./dist/cli.js",
     "ars-mcp": "./dist/mcp.js"
+  },
+  "exports": {
+    "./mcp": "./dist/mcp.js"
   },
   "scripts": {
     "build": "tsup",

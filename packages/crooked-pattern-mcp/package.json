@@ -1,0 +1,19 @@
+{
+  "name": "crooked-pattern-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Crooked Pattern (Agentic Readiness Score) — thin wrapper so MCP client configs can run `npx crooked-pattern-mcp`",
+  "license": "MIT",
+  "keywords": ["mcp", "model-context-protocol", "agentic-readiness", "ars"],
+  "type": "module",
+  "bin": {
+    "ars-mcp": "./bin.js",
+    "crooked-pattern-mcp": "./bin.js"
+  },
+  "files": ["bin.js"],
+  "dependencies": {
+    "crooked-pattern": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

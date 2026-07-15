@@ -62,6 +62,15 @@ node dist/mcp.js
 # or register with an MCP client, e.g.: claude mcp add ars -- node dist/mcp.js
 ```
 
+Stdio is the only transport enabled by default. A streamable HTTP/SSE binding is opt-in behind an explicit flag (per the v0.1 scope freeze) and binds loopback:
+
+```sh
+node dist/mcp.js --transport sse --port 3339
+# announces: ars-mcp listening on http://127.0.0.1:3339/mcp
+```
+
+No environment variable or config file can enable the network transport implicitly.
+
 The authored contract in `mcp/server-card.json` is the same contract the runtime serves: a test connects a real MCP client to the server and asserts the card's tools match the live `tools/list` response, and the source/wire reconciliation check (`both.mcp_tool_count_agreement`) is exercised against this surface in both agreeing and diverging configurations. The CLI and the MCP tool wrap one shared scan pipeline, so scores cannot drift between entry points.
 
 ## Supply-chain evidence
