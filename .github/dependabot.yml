@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Keep the GitHub Actions in these workflows patched (action supply chain).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Watch runtime/dev dependencies for security and version updates.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

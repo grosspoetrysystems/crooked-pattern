@@ -1,0 +1,51 @@
+name: publish
+
+# Publishes on a version tag push (e.g. `git tag v0.1.2 && git push origin v0.1.2`).
+on:
+  push:
+    tags:
+      - 'v*'
+
+# OIDC trusted publishing: no NPM_TOKEN secret, no interactive 2FA.
+# `id-token: write` lets npm mint a short-lived token and generate provenance.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - run: pnpm install --frozen-lockfile
+
+      # Refuse to publish if the tag and the package version disagree.
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG}." >&2
+            exit 1
+          fi
+
+      # Full quality gate (typecheck, lint, tests, build, smoke, dead-code)
+      # runs against the exact tagged commit before anything is published.
+      - run: pnpm verify
+
+      # Trusted publishing requires npm >= 11.5.1; guarantee a current npm.
+      - run: npm install -g npm@latest
+
+      # Publish the main package first — the wrapper pins it as a dependency.
+      # Provenance is generated automatically under OIDC; --provenance is explicit.
+      - name: Publish @grosspoetrysystems/crooked-pattern
+        run: npm publish --provenance --access public
+
+      - name: Publish @grosspoetrysystems/crooked-pattern-mcp
+        run: npm publish --provenance --access public
+        working-directory: packages/crooked-pattern-mcp

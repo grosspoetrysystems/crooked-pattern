@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Least privilege by default; no job needs write access.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+      - run: pnpm coverage
+      # Dogfood: scan this repo with the scanner it ships. A crash or a
+      # regressed supply-chain posture on our own code fails the build.
+      - name: Self-scan (dogfood)
+        run: |
+          node dist/cli.js scan --source . --out .tempor/ci-selfscan
+          echo '::group::ars self-scan report'
+          cat .tempor/ci-selfscan/ars-report.md
+          echo '::endgroup::'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ars-selfscan
+          path: .tempor/ci-selfscan/
+
+  # Blocks pull requests that introduce known-vulnerable or disallowed
+  # dependencies before they can be merged (supply-chain injection guard).
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
