@@ -117,6 +117,100 @@ describe('supply-chain adapter reports', () => {
   });
 });
 
+describe('raw scanner output ingestion', () => {
+  it('normalizes raw osv-scanner JSON output into the OsvScanReport contract', async () => {
+    const report = await readOsvScanReport(path.join(reports, 'osv-raw.json'));
+
+    expect(report.tool).toBe('osv-scanner');
+    expect(report.packages_scanned).toBeUndefined();
+    expect(report.vulnerabilities).toEqual([
+      {
+        id: 'GHSA-aaaa-bbbb-cccc',
+        package: 'tiny-dep',
+        version: '1.0.3',
+        severity: 'critical',
+      },
+      {
+        id: 'GHSA-dddd-eeee-ffff',
+        package: 'other-dep',
+        version: '2.1.0',
+        severity: 'moderate',
+      },
+    ]);
+  });
+
+  it('normalizes raw semgrep --json output into the SemgrepScanReport contract', async () => {
+    const report = await readSemgrepScanReport(
+      path.join(reports, 'semgrep-raw.json')
+    );
+
+    expect(report.tool).toBe('semgrep');
+    expect(report.findings).toEqual([
+      {
+        rule_id: 'javascript.lang.security.audit.unsafe-eval',
+        path: 'src/index.js',
+        severity: 'warning',
+      },
+      {
+        rule_id: 'javascript.express.security.audit.sql-injection',
+        path: 'src/server.js',
+        severity: 'error',
+      },
+    ]);
+  });
+
+  it('normalizes Socket facts JSON into the SocketScanReport contract', async () => {
+    const report = await readSocketScanReport(
+      path.join(reports, 'socket-facts.json')
+    );
+
+    expect(report.tool).toBe('socket');
+    expect(report.alerts).toEqual([
+      { package: 'src/index.js', type: 'secret', severity: 'high' },
+      { package: 'Dockerfile', type: 'container', severity: 'moderate' },
+    ]);
+  });
+
+  it('normalizes raw reports deterministically (identical input, identical output)', async () => {
+    const [first, second] = await Promise.all([
+      readOsvScanReport(path.join(reports, 'osv-raw.json')),
+      readOsvScanReport(path.join(reports, 'osv-raw.json')),
+    ]);
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
+
+  it('feeds raw-ingested reports through the source pass with contract semantics', async () => {
+    const checks = await runSourcePass(pnpmProject, {
+      supplyChain: {
+        osv: {
+          report: await readOsvScanReport(path.join(reports, 'osv-raw.json')),
+        },
+        socket: {
+          report: await readSocketScanReport(
+            path.join(reports, 'socket-facts.json')
+          ),
+        },
+        semgrep: {
+          report: await readSemgrepScanReport(
+            path.join(reports, 'semgrep-raw.json')
+          ),
+        },
+      },
+    });
+
+    const osv = findCheck(checks, 'source.osv_vulnerabilities');
+    expect(osv?.result).toBe('fail');
+    expect(osv?.notes.join(' ')).toContain('GHSA-aaaa-bbbb-cccc');
+
+    const socket = findCheck(checks, 'source.socket_alerts');
+    expect(socket?.result).toBe('fail');
+    expect(socket?.notes.join(' ')).toContain('secret');
+
+    const semgrep = findCheck(checks, 'source.semgrep_findings');
+    expect(semgrep?.result).toBe('fail');
+  });
+});
+
 describe('supply-chain report files', () => {
   it('rejects reports with the wrong tool tag', async () => {
     await expect(

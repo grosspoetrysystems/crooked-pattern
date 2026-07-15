@@ -1,0 +1,29 @@
+{
+  "version": "1.85.0",
+  "results": [
+    {
+      "check_id": "javascript.lang.security.audit.unsafe-eval",
+      "path": "src/index.js",
+      "start": { "line": 10, "col": 5 },
+      "end": { "line": 10, "col": 25 },
+      "extra": {
+        "message": "Detected use of eval with dynamic input.",
+        "severity": "WARNING",
+        "metadata": { "category": "security" }
+      }
+    },
+    {
+      "check_id": "javascript.express.security.audit.sql-injection",
+      "path": "src/server.js",
+      "start": { "line": 42, "col": 3 },
+      "end": { "line": 44, "col": 8 },
+      "extra": {
+        "message": "Possible SQL injection from unsanitized input.",
+        "severity": "ERROR",
+        "metadata": { "category": "security" }
+      }
+    }
+  ],
+  "errors": [],
+  "paths": { "scanned": ["src/index.js", "src/server.js"] }
+}

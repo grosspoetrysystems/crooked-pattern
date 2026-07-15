@@ -21,6 +21,67 @@ interface CheckDefinition {
   allowed_labels: string[];
 }
 
+// Versioned classifier lexicon for the Rule-of-Two v0.1 predicate (see
+// docs/scope-freeze-v0.1.md, D2). Classes are assigned to declared MCP tools
+// by word-boundary matches over tool name, description, and schema text.
+export const RULE_OF_TWO_LEXICON = {
+  version: '0.1',
+  classes: {
+    untrusted_content: [
+      'fetch',
+      'url',
+      'browse',
+      'crawl',
+      'scrape',
+      'download',
+      'web page',
+      'webpage',
+      'search the web',
+      'external content',
+      'rss',
+      'inbound',
+      'untrusted',
+    ],
+    private_data: [
+      'account',
+      'profile',
+      'inbox',
+      'payment',
+      'customer',
+      'token',
+      'secret',
+      'credential',
+      'password',
+      'api key',
+      'billing',
+      'contacts',
+      'private',
+      'personal data',
+    ],
+    side_effects: [
+      'send',
+      'post',
+      'create',
+      'update',
+      'delete',
+      'transfer',
+      'purchase',
+      'pay',
+      'execute',
+      'submit',
+      'publish',
+      'upload',
+      'webhook',
+      'email',
+      'message',
+      'remove',
+      'write',
+    ],
+  },
+} as const;
+
+export type RuleOfTwoClass = keyof typeof RULE_OF_TWO_LEXICON.classes;
+
 const high = metadata('high', 'implemented');
 const heuristic = metadata('heuristic', 'partial', ['heuristic']);
 const adapterMissing = metadata('unknown', 'adapter_missing', [
@@ -107,6 +168,15 @@ export const CHECK_REGISTRY = defineRegistry([
     ['Safety Modifier'],
     heuristic,
     ['parsed-lockfile']
+  ),
+  definition(
+    'source.ecosystem_presence',
+    'non-Node ecosystem presence',
+    'supply_chain_safety',
+    'SOURCE_ONLY',
+    8,
+    ['Safety Modifier'],
+    metadata('high', 'partial', ['file-presence'])
   ),
   definition(
     'source.osv_vulnerabilities',
@@ -426,8 +496,7 @@ export const CHECK_REGISTRY = defineRegistry([
     'WIRE_ONLY',
     35,
     ['Safety Modifier'],
-    heuristic,
-    ['html-keywords']
+    metadata('high', 'implemented', ['tool-schema', 'lexicon-v0.1'])
   ),
   definition(
     'wire.manifest_pinning',

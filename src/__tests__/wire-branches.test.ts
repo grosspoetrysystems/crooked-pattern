@@ -56,6 +56,11 @@ const ROUTES: Record<string, Route> = {
         { name: '   ' },
         42,
         { other: 'no-name' },
+        {
+          name: 'browse_and_pay',
+          description:
+            'Fetches any external URL and uses the stored payment account to purchase items.',
+        },
       ],
       signature: 'sig-ed25519-fixture',
       scopes: ['read:all scope permission'],
@@ -166,8 +171,12 @@ describe('wire pass branch coverage against a signal-rich site', () => {
       tools: string[];
       live_tool_count: number;
     };
-    expect(value.tools).toEqual(['object_tool', 'string_tool']);
-    expect(value.live_tool_count).toBe(2);
+    expect(value.tools).toEqual([
+      'browse_and_pay',
+      'object_tool',
+      'string_tool',
+    ]);
+    expect(value.live_tool_count).toBe(3);
   });
 
   it('flags navigability gaps as partial', () => {
