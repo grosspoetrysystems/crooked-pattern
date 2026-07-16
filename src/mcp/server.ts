@@ -33,6 +33,12 @@ const scanSiteInputShape = {
 const scanSiteOutputShape = {
   ars_final: z.number(),
   ars_readiness: z.number(),
+  agent_safety: z
+    .number()
+    .nullable()
+    .describe(
+      'the deeper Agent-Safety score (supply-chain + agent-interface), or null when no safety evidence was measured'
+    ),
   tier: z.string(),
   json_path: z.string(),
   report_path: z.string(),
@@ -117,6 +123,7 @@ export function createArsMcpServer(): McpServer {
       const structured = {
         ars_final: outcome.artifact.summary.ars_final,
         ars_readiness: outcome.artifact.summary.ars_readiness,
+        agent_safety: outcome.artifact.summary.agent_safety,
         tier: outcome.artifact.summary.tier,
         json_path: outcome.jsonPath,
         report_path: outcome.reportPath,

@@ -53,7 +53,7 @@ describe('CLI integration pipeline', () => {
     expect(artifact.summary.categories.crawl_access?.result).toBe('unassessed');
 
     const report = await readFile(path.join(outDir, 'ars-report.md'), 'utf8');
-    expect(report).toContain('Agentic Readiness Score Report');
+    expect(report).toContain('Agentic Readiness Report');
     expect(report).toContain('categories measured');
   });
 
@@ -164,7 +164,7 @@ describe('CLI integration pipeline', () => {
     expect(clean.code).toBe(0);
   });
 
-  it('prints category coverage in the scan summary line', async () => {
+  it('prints both scores and category coverage in the scan summary line', async () => {
     const outDir = path.join(outRoot, 'summary-line');
     const result = await runCli([
       'scan',
@@ -175,7 +175,7 @@ describe('CLI integration pipeline', () => {
     ]);
 
     expect(result.stdout).toMatch(
-      /readiness \d+\/100 \(\d+ of \d+ categories measured\)/
+      /Agent-Readiness \d+\/100 \(tier .+, \d+\/\d+ categories\); Agent-Safety (\d+\/100|not assessed)/
     );
   });
 

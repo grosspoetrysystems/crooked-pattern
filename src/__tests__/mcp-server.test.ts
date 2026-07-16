@@ -85,7 +85,7 @@ describe('ars MCP server', () => {
       '"schema_version": "ars.v1"'
     );
     await expect(readFile(structured.report_path, 'utf8')).resolves.toContain(
-      'Agentic Readiness Score Report'
+      'Agentic Readiness Report'
     );
   });
 

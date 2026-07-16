@@ -16,18 +16,19 @@ export function markdownReport(artifact: ArsArtifact) {
   );
 
   const lines: (string | undefined)[] = [
-    '# Agentic Readiness Score Report',
+    '# Agentic Readiness Report',
     '',
     `Generated: ${artifact.generated_at}`,
     '',
-    `- ARS final: **${s.ars_final}/100**`,
-    `- ARS readiness: **${s.ars_readiness}/100** (${s.measured_categories} of ${s.total_categories} categories measured)`,
-    `- Exposure multiplier: **${s.exposure_multiplier}**`,
-    `  - ${exposureExplanation(artifact)}`,
-    `- Maturity tier: **${s.tier}** (highest consecutive gate passed)`,
+    '## Agent-Readiness',
+    '',
+    `**${s.ars_final}/100** — readiness ${s.ars_readiness}/100 (${s.measured_categories} of ${s.total_categories} categories measured), maturity tier **${s.tier}**.`,
+    `- ${exposureExplanation(artifact)}`,
     blockingGateLine(s.gates),
-    `- Build-time supply-chain safety: **${safetyValue(s.safety.build_time_supply_chain)}**`,
-    `- Runtime agent-interaction safety: **${safetyValue(s.safety.runtime_agent_interaction)}**`,
+    '',
+    '## Agent-Safety — the deeper score',
+    '',
+    ...agentSafetyLines(s),
     '',
     '## Category Scores',
     '',
@@ -78,6 +79,18 @@ export function markdownReport(artifact: ArsArtifact) {
 
 function safetyValue(value: number | null) {
   return value === null ? 'unassessed' : `${value}/100`;
+}
+
+function agentSafetyLines(s: ArsArtifact['summary']): string[] {
+  if (s.agent_safety === null)
+    return [
+      'Not assessed — scan a repo (supply-chain hygiene) or a site that exposes an agent interface (runtime safety) to compute this deeper score.',
+    ];
+  return [
+    `**${s.agent_safety}/100** — combined supply-chain and agent-interface safety posture.`,
+    `- Build-time supply-chain: ${safetyValue(s.safety.build_time_supply_chain)} · Runtime agent-interaction: ${safetyValue(s.safety.runtime_agent_interaction)}`,
+    '- Want to go deeper? The per-check safety breakdown and remediation are the agent-safety tier.',
+  ];
 }
 
 function exposureExplanation(artifact: ArsArtifact) {

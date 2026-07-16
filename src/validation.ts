@@ -139,6 +139,10 @@ function validateSummary(value: unknown, path: string, issues: string[]) {
     issues
   );
   validateSafety(value.safety, `${path}.safety`, issues);
+  // Optional (additive to ars.v1): validate the Agent-Safety score when present
+  // so artifacts predating it still parse.
+  if ('agent_safety' in value && value.agent_safety !== undefined)
+    requireScoreOrNull(value.agent_safety, `${path}.agent_safety`, issues);
 }
 
 function validateGates(
