@@ -1006,9 +1006,9 @@ interface ToolClassification {
   matched_terms: RuleOfTwoClasses;
 }
 
-// Rule-of-Two v0.1 (docs/scope-freeze-v0.1.md, D2): a machine-checkable
-// predicate over declared MCP tool schemas. Page HTML plays no part; absent
-// tool schemas yield unknown, never a fabricated pass/fail.
+// Rule-of-Two v0.1: a machine-checkable predicate over declared MCP tool
+// schemas. Page HTML plays no part; absent tool schemas yield unknown, never
+// a fabricated pass/fail.
 function ruleOfTwoCheck(
   card: ServerCard | undefined,
   cardServed: boolean

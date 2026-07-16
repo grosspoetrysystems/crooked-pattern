@@ -21,9 +21,9 @@ interface CheckDefinition {
   allowed_labels: string[];
 }
 
-// Versioned classifier lexicon for the Rule-of-Two v0.1 predicate (see
-// docs/scope-freeze-v0.1.md, D2). Classes are assigned to declared MCP tools
-// by word-boundary matches over tool name, description, and schema text.
+// Versioned classifier lexicon for the Rule-of-Two v0.1 predicate. Classes
+// are assigned to declared MCP tools by word-boundary matches over tool
+// name, description, and schema text.
 export const RULE_OF_TWO_LEXICON = {
   version: '0.1',
   classes: {

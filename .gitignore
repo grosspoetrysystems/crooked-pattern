@@ -14,3 +14,6 @@ coverage/
 # Local AI build-methodology (kept out of the product repo)
 .agents/
 .claude/
+
+# Local planning artifacts (not product docs)
+.planning/
