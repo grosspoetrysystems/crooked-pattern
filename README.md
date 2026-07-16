@@ -42,6 +42,8 @@ ars diff baseline/ars.json current/ars.json --fail-on tier-drop,gate-regression,
 - **Wire pass** (`--url <url>`): live signals — robots/sitemap/llms.txt, structured metadata (JSON-LD, Open Graph), content legibility, MCP server cards, OpenAPI/OAuth discovery, AGENTS.md, accessibility semantics, and runtime agent-safety posture. Well-known endpoints only count when their content is plausible for the format — SPA catch-all rewrites don't fabricate passes. An unreachable origin is an operational error, not a scored result.
 - **Honesty contract**: the rubric registry is the single source of truth for check identity, weights, and gate membership; unknown evidence stays unknown; heuristic-confidence checks are labeled as such in the artifact and collapsed into an explicit caveat in the report.
 
+For how the score is computed and the standard behind each check — and why, say, `llms.txt` is weighted near zero — see **[docs/methodology.md](docs/methodology.md)**.
+
 ### Rule-of-Two posture
 
 `wire.rule_of_two` implements a machine-checkable Rule-of-Two / lethal-trifecta predicate over **declared MCP tool schemas**: each declared tool is classified against a versioned lexicon into untrusted-content ingestion, private-data access, and external side effects; the check fails when a single tool spans all three, or the toolset spans all three with no machine-readable session isolation. It classifies the *declared* surface only — a server controls its own descriptions — so treat it as a screening signal, not a safety verdict. Sites with no MCP tool schemas report `unknown` with no score penalty.

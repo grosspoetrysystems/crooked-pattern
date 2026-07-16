@@ -99,6 +99,69 @@ describe('wire pass honesty', () => {
     );
   }, 30_000);
 
+  it('passes when AI crawlers are addressed and permitted', async () => {
+    const url = await serve((pathname) =>
+      pathname === '/'
+        ? { body: SPA_HTML }
+        : pathname === '/robots.txt'
+          ? {
+              body: 'User-agent: GPTBot\nAllow: /\n\nUser-agent: *\nDisallow: /private\n',
+              type: 'text/plain',
+            }
+          : undefined
+    );
+    const checks = await runWirePass(url);
+    expect(findCheck(checks, 'wire.ai_crawler_directives')?.result).toBe(
+      'pass'
+    );
+  }, 30_000);
+
+  it('fails (anti-readiness) when robots.txt blocks AI crawlers', async () => {
+    const url = await serve((pathname) =>
+      pathname === '/'
+        ? { body: SPA_HTML }
+        : pathname === '/robots.txt'
+          ? {
+              body: 'User-agent: GPTBot\nDisallow: /\n\nUser-agent: ClaudeBot\nDisallow: /\n',
+              type: 'text/plain',
+            }
+          : undefined
+    );
+    const checks = await runWirePass(url);
+    const directives = findCheck(checks, 'wire.ai_crawler_directives');
+    expect(directives?.result).toBe('fail');
+    expect(directives?.notes.join(' ')).toMatch(/block/i);
+    expect(directives?.notes.join(' ')).toContain('GPTBot');
+  }, 30_000);
+
+  it('is partial when robots.txt has no AI-specific directives', async () => {
+    const url = await serve((pathname) =>
+      pathname === '/'
+        ? { body: SPA_HTML }
+        : pathname === '/robots.txt'
+          ? { body: 'User-agent: *\nDisallow: /private\n', type: 'text/plain' }
+          : undefined
+    );
+    const checks = await runWirePass(url);
+    expect(findCheck(checks, 'wire.ai_crawler_directives')?.result).toBe(
+      'partial'
+    );
+  }, 30_000);
+
+  it('fails when a blanket Disallow: / blocks every agent', async () => {
+    const url = await serve((pathname) =>
+      pathname === '/'
+        ? { body: SPA_HTML }
+        : pathname === '/robots.txt'
+          ? { body: 'User-agent: *\nDisallow: /\n', type: 'text/plain' }
+          : undefined
+    );
+    const checks = await runWirePass(url);
+    expect(findCheck(checks, 'wire.ai_crawler_directives')?.result).toBe(
+      'fail'
+    );
+  }, 30_000);
+
   it('flags hidden text payloads with evidence snippets', async () => {
     const body = [
       '<html><body><p>',
