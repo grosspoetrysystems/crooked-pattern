@@ -84,11 +84,7 @@ export async function runWirePass(
       { wire_value: robots?.status }
     )
   );
-  const aiDirectives = robots
-    ? /GPTBot|ClaudeBot|Google-Extended|PerplexityBot|CCBot|anthropic-ai/i.test(
-        robots.text
-      )
-    : false;
+  const crawlerAccess = assessAiCrawlerAccess(robots?.text);
   results.push(
     check(
       'wire.ai_crawler_directives',
@@ -96,15 +92,10 @@ export async function runWirePass(
       'crawl_access',
       'WIRE_ONLY',
       4,
-      robots ? (aiDirectives ? 'pass' : 'partial') : 'unknown',
-      aiDirectives ? 100 : robots ? 40 : 0,
-      [
-        robots
-          ? aiDirectives
-            ? 'robots.txt includes explicit AI crawler directives.'
-            : 'No explicit AI crawler directives found; this may be intentional but is less legible to agents.'
-          : 'robots.txt unavailable; AI crawler directives are not assessable.',
-      ]
+      crawlerAccess.result,
+      crawlerAccess.score,
+      [crawlerAccess.note],
+      { wire_value: { blocked: crawlerAccess.blocked } }
     )
   );
   results.push(
@@ -742,6 +733,116 @@ export async function runWirePass(
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
+
+// Agent-readiness is about whether AI agents are *allowed*, so this scores the
+// direction of robots.txt rules, not merely the presence of AI-crawler tokens:
+// a site that Disallows GPTBot/ClaudeBot is working against readiness.
+const AI_CRAWLER_TOKENS = [
+  'GPTBot',
+  'OAI-SearchBot',
+  'ChatGPT-User',
+  'ClaudeBot',
+  'Claude-User',
+  'Claude-SearchBot',
+  'Google-Extended',
+  'PerplexityBot',
+  'CCBot',
+  'anthropic-ai',
+  'Applebot-Extended',
+  'Bytespider',
+];
+
+interface RobotsRules {
+  disallow: string[];
+  allow: string[];
+}
+
+function parseRobotsGroups(text: string): Map<string, RobotsRules> {
+  const groups = new Map<string, RobotsRules>();
+  let current: string[] = [];
+  let sawDirective = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    const colon = line.indexOf(':');
+    if (colon === -1) continue;
+    const key = line.slice(0, colon).trim().toLowerCase();
+    const value = line.slice(colon + 1).trim();
+    if (key === 'user-agent') {
+      // A directive ends a run of consecutive user-agents; the next
+      // user-agent starts a fresh group.
+      if (sawDirective) {
+        current = [];
+        sawDirective = false;
+      }
+      const ua = value.toLowerCase();
+      current.push(ua);
+      if (!groups.has(ua)) groups.set(ua, { disallow: [], allow: [] });
+    } else if (key === 'disallow' || key === 'allow') {
+      sawDirective = true;
+      for (const ua of current) {
+        groups.get(ua)?.[key === 'disallow' ? 'disallow' : 'allow'].push(value);
+      }
+    }
+  }
+  return groups;
+}
+
+function blocksRoot(rules: RobotsRules | undefined): boolean {
+  if (!rules) return false;
+  return (
+    rules.disallow.some((path) => path === '/') &&
+    !rules.allow.some((path) => path === '/')
+  );
+}
+
+function assessAiCrawlerAccess(robotsText: string | undefined): {
+  result: 'pass' | 'partial' | 'fail' | 'unknown';
+  score: number;
+  note: string;
+  blocked: string[];
+} {
+  if (robotsText === undefined)
+    return {
+      result: 'unknown',
+      score: 0,
+      note: 'robots.txt unavailable; AI crawler access is not assessable.',
+      blocked: [],
+    };
+  const groups = parseRobotsGroups(robotsText);
+  const aiBlocked = AI_CRAWLER_TOKENS.filter((token) =>
+    blocksRoot(groups.get(token.toLowerCase()))
+  );
+  if (aiBlocked.length)
+    return {
+      result: 'fail',
+      score: 0,
+      note: `robots.txt blocks AI agents with Disallow: / (${aiBlocked.join(', ')}) — this works against agent-readiness.`,
+      blocked: aiBlocked,
+    };
+  if (blocksRoot(groups.get('*')))
+    return {
+      result: 'fail',
+      score: 0,
+      note: 'robots.txt blocks all crawlers (User-agent: * with Disallow: /), including AI agents — this works against agent-readiness.',
+      blocked: ['*'],
+    };
+  const addressed = AI_CRAWLER_TOKENS.filter((token) =>
+    groups.has(token.toLowerCase())
+  );
+  if (addressed.length)
+    return {
+      result: 'pass',
+      score: 100,
+      note: `robots.txt names AI crawlers (${addressed.join(', ')}) and permits their access.`,
+      blocked: [],
+    };
+  return {
+    result: 'partial',
+    score: 40,
+    note: 'No AI-specific crawler directives; agents fall under the default rules. Explicitly welcoming AI crawlers is more legible to them.',
+    blocked: [],
+  };
+}
 
 function normalizeUrl(input: string) {
   const candidate = /^https?:\/\//i.test(input) ? input : `https://${input}`;
