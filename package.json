@@ -34,6 +34,7 @@
     "dev": "tsx src/bin/cli.ts",
     "scan": "tsx src/bin/cli.ts scan",
     "diff": "tsx src/bin/cli.ts diff",
+    "bump": "node scripts/bump.mjs",
     "lint": "biome check src package.json tsconfig.json tsup.config.ts vitest.config.ts vitest.global-setup.ts knip.config.ts commitlint.config.js biome.jsonc",
     "format": "biome check --write src package.json tsconfig.json tsup.config.ts vitest.config.ts vitest.global-setup.ts knip.config.ts commitlint.config.js biome.jsonc",
     "test": "vitest run",

@@ -20,16 +20,30 @@ Publishing is done by CI (`.github/workflows/publish.yml`) via npm **trusted pub
 
    Each package allows exactly one trusted publisher.
 
+## Branch model
+
+Work lands on feature branches → PR into `dev` (CI runs). When `dev` is release-ready, promote it to `main` via a release PR. `main` is the production line and is protected (PR + passing CI required); it only ever holds shipped-or-next code.
+
 ## Cutting a release
 
+The version is single-sourced from `package.json` (injected into the CLI and MCP server at build time), so a release bumps **one** number. `pnpm bump` does the lockstep bump across both packages and the wrapper's dependency pin, and stubs a CHANGELOG entry.
+
 ```sh
-# bump the version in package.json + packages/crooked-pattern-mcp/package.json
-# (keep them in lockstep; update cli.ts/server.ts/server-card.json versions),
-# add a CHANGELOG entry, then:
+# on dev (or a release branch cut from dev):
+pnpm bump patch          # or minor | major | X.Y.Z
+# fill in the CHANGELOG bullets it stubbed, then:
 git commit -am "chore: release vX.Y.Z"
-git tag vX.Y.Z
-git push origin master
-git push origin vX.Y.Z          # this triggers publish.yml
+# open a PR dev -> main and merge it (CI must pass).
+```
+
+Then **go to production** one of two ways:
+
+```sh
+# A) tag the merge commit on main:
+git tag vX.Y.Z && git push origin vX.Y.Z        # triggers publish.yml
+
+# B) or the button: Actions -> publish -> Run workflow -> branch: main
+#    (publishes main's current package.json version)
 ```
 
 The workflow runs in two isolated jobs:
