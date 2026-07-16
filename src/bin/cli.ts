@@ -71,8 +71,11 @@ program
         supplyChain,
         out: opts.out,
       });
+      const s = artifact.summary;
+      const safety =
+        s.agent_safety === null ? 'not assessed' : `${s.agent_safety}/100`;
       console.log(
-        `ARS final ${artifact.summary.ars_final}/100; readiness ${artifact.summary.ars_readiness}/100 (${artifact.summary.measured_categories} of ${artifact.summary.total_categories} categories measured); tier ${artifact.summary.tier}`
+        `Agent-Readiness ${s.ars_final}/100 (tier ${s.tier}, ${s.measured_categories}/${s.total_categories} categories); Agent-Safety ${safety}`
       );
       console.log(`Wrote ${jsonPath} and ${reportPath}`);
     }

@@ -101,6 +101,10 @@ export interface ScoreSummary {
   categories: Record<string, CategoryScore>;
   measured_categories: number;
   total_categories: number;
+  // The second headline score (the "deeper" Agent-Safety tier): a combined
+  // supply-chain + runtime agent-interaction safety number, independent of the
+  // Agent-Readiness score above. null when no safety evidence was measured.
+  agent_safety: number | null;
   safety: {
     // null = the corresponding checks were unmeasured (never rendered as 0).
     build_time_supply_chain: number | null;

@@ -37,6 +37,6 @@ describe('built CLI', () => {
     ).resolves.toContain('"schema_version": "ars.v1"');
     await expect(
       readFile(path.join(outDir, 'ars-report.md'), 'utf8')
-    ).resolves.toContain('Agentic Readiness Score Report');
+    ).resolves.toContain('Agentic Readiness Report');
   }, 30_000);
 });

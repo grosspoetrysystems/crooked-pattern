@@ -115,6 +115,55 @@ describe('score', () => {
     expect(summary.exposure_multiplier).toBe(1);
   });
 
+  it('computes a combined Agent-Safety score from supply-chain and runtime safety', () => {
+    const summary = score([
+      ...readinessChecks(100),
+      check(
+        'source.lockfile_pinning',
+        'lockfile',
+        'supply_chain_safety',
+        'SOURCE_ONLY',
+        1,
+        'pass',
+        80
+      ),
+      check(
+        'runtime',
+        'runtime',
+        'runtime_agent_safety',
+        'WIRE_ONLY',
+        1,
+        'pass',
+        60
+      ),
+    ]);
+
+    expect(summary.safety.build_time_supply_chain).toBe(80);
+    expect(summary.safety.runtime_agent_interaction).toBe(60);
+    // Agent-Safety is the deeper score, independent of the readiness number.
+    expect(summary.agent_safety).toBe(70);
+  });
+
+  it('reports Agent-Safety from whichever safety lens is present', () => {
+    const sourceOnly = score([
+      check(
+        'source.lockfile_pinning',
+        'lockfile',
+        'supply_chain_safety',
+        'SOURCE_ONLY',
+        1,
+        'pass',
+        90
+      ),
+    ]);
+    expect(sourceOnly.agent_safety).toBe(90);
+  });
+
+  it('leaves Agent-Safety null when no safety evidence was measured', () => {
+    const summary = score(readinessChecks(100));
+    expect(summary.agent_safety).toBeNull();
+  });
+
   it('excludes all-unknown readiness categories from the denominator', () => {
     const summary = score([
       check('crawl', 'crawl', 'crawl_access', 'WIRE_ONLY', 12, 'pass', 50),

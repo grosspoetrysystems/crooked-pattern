@@ -28,15 +28,41 @@ const exposedCard = wireCheck('wire.mcp_server_card', 'pass', 100, {
 });
 
 describe('markdown report honesty presentation', () => {
-  it('renders unmeasured safety as unassessed, not 0/100', () => {
+  it('presents two scores and renders unmeasured Agent-Safety as not assessed, not 0/100', () => {
     const artifact = buildArtifact({ url: 'https://example.com' }, [
       wireCheck('wire.robots', 'pass', 100),
     ]);
     const report = markdownReport(artifact);
 
-    expect(artifact.summary.safety.build_time_supply_chain).toBeNull();
-    expect(report).toContain('Build-time supply-chain safety: **unassessed**');
-    expect(report).not.toContain('Build-time supply-chain safety: **0/100**');
+    // Two named headline scores.
+    expect(report).toContain('## Agent-Readiness');
+    expect(report).toContain('## Agent-Safety — the deeper score');
+    // No safety evidence measured → not assessed, never a fabricated 0/100.
+    expect(artifact.summary.agent_safety).toBeNull();
+    expect(report).toContain('Not assessed');
+    expect(report).not.toContain('Agent-Safety score: **0/100**');
+  });
+
+  it('renders the Agent-Safety score with components when safety is measured', () => {
+    const artifact = buildArtifact({ url: 'https://example.com' }, [
+      wireCheck('wire.robots', 'pass', 100),
+      check(
+        'runtime',
+        'runtime',
+        'runtime_agent_safety',
+        'WIRE_ONLY',
+        1,
+        'pass',
+        80
+      ),
+    ]);
+    const report = markdownReport(artifact);
+
+    expect(artifact.summary.agent_safety).toBe(80);
+    expect(report).toMatch(
+      /\*\*80\/100\*\* — combined supply-chain and agent-interface/
+    );
+    expect(report).toMatch(/Runtime agent-interaction: 80\/100/);
   });
 
   it('explains the exposure multiplier when a penalty applies', () => {

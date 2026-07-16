@@ -81,11 +81,28 @@ export function score(checks: CheckResult[]): ScoreSummary {
     categories,
     measured_categories: measuredCategories,
     total_categories: readinessCategories.length,
+    agent_safety: combineSafety(buildSafety, runtimeSafety),
     safety: {
       build_time_supply_chain: buildSafety,
       runtime_agent_interaction: runtimeSafety,
     },
   };
+}
+
+// The deeper Agent-Safety score: average of whichever safety lenses were
+// measured (build-time supply chain, runtime agent interaction). null when
+// neither was measured, so it renders as "not assessed" rather than 0.
+function combineSafety(
+  buildSafety: number | null,
+  runtimeSafety: number | null
+): number | null {
+  const measured = [buildSafety, runtimeSafety].filter(
+    (value): value is number => value !== null
+  );
+  if (!measured.length) return null;
+  return clamp(
+    measured.reduce((sum, value) => sum + value, 0) / measured.length
+  );
 }
 
 function hasActualExposure(checks: CheckResult[]) {
