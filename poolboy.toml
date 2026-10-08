@@ -1,0 +1,4 @@
+spec = "0.2"
+corpus = "docs"
+output = "site"
+ignore = ["packaging"]

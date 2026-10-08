@@ -1,3 +1,7 @@
+---
+type: guide
+title: Releasing
+---
 # Releasing
 
 Publishing is done by CI (`.github/workflows/publish.yml`) via npm **trusted publishing** (OIDC) with **provenance**. There is no npm token stored anywhere, and no interactive 2FA in the release path. The deliberate human gate lives in a required-approval GitHub Environment instead.
