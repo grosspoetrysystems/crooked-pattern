@@ -1,3 +1,7 @@
+---
+type: concept
+title: Methodology
+---
 # Methodology — how the Agentic Readiness Score works, and why to trust it
 
 This document explains what crooked-pattern measures, how it turns checks into a number, and — most importantly — how each check is grounded in a real standard. A score is only worth sharing if it is earned; this is where you can see that it is.

@@ -1,0 +1,35 @@
+# Publishes the Poolboy corpus in site/ to GitHub Pages.
+# Copied from poolboy's examples/github-pages.yml; output is site/ because
+# dist/ is this package's compiled JavaScript.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: poolboy-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx --yes @grosspoetrysystems/poolboy check
+      - run: npx --yes @grosspoetrysystems/poolboy build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
