@@ -7,15 +7,24 @@ import { describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '../..');
 
+// `npm pack --json` is documented to emit JSON, but some npm versions still run
+// (and print) lifecycle output despite --ignore-scripts — lefthook's prepare
+// writes "sync hooks" on a fresh checkout, which is CI's condition. Read the
+// JSON array rather than assuming it starts at byte zero.
+function packJson(stdout: string): { files: { path: string }[] }[] {
+  const start = stdout.indexOf('[');
+  if (start < 0) throw new Error(`npm pack --json emitted no JSON: ${stdout}`);
+  return JSON.parse(stdout.slice(start)) as { files: { path: string }[] }[];
+}
+
 async function packedFiles(directory: string): Promise<string[]> {
-  // --ignore-scripts keeps lifecycle output (lefthook prepare) out of the
-  // JSON; hashed tsup chunk names are normalized so the allowlist is stable.
+  // Hashed tsup chunk names are normalized so the allowlist is stable.
   const { stdout } = await execFileAsync(
     'npm',
     ['pack', '--dry-run', '--ignore-scripts', '--json'],
     { cwd: directory }
   );
-  const [result] = JSON.parse(stdout) as { files: { path: string }[] }[];
+  const [result] = packJson(stdout);
   return result.files
     .map((file) => file.path.replace(/chunk-[A-Z0-9]+\.js/, 'chunk-*.js'))
     .sort();
@@ -31,6 +40,12 @@ async function allowlist(name: string): Promise<string[]> {
 }
 
 describe('package tarball allowlists', () => {
+  it('reads pack JSON even when a lifecycle script printed first', () => {
+    const polluted = 'sync hooks: ✔️\n[{"files":[{"path":"dist/cli.js"}]}]\n';
+
+    expect(packJson(polluted)[0].files).toEqual([{ path: 'dist/cli.js' }]);
+  });
+
   it('crooked-pattern tarball matches the committed allowlist exactly', async () => {
     const files = await packedFiles(root);
 
