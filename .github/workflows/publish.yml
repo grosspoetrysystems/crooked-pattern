@@ -17,7 +17,8 @@ permissions:
 jobs:
   # Build runs all third-party code (dependency install scripts, the build)
   # but has NO id-token, so a compromised build dependency cannot mint a
-  # publish credential. Its only output is the built dist/ artifact.
+  # publish credential. Its output is the compiled dist/ plus the exact
+  # pinned Poolboy site/ corpus consumed by npm publish.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +28,8 @@ jobs:
         with:
           node-version: '24'
       - run: pnpm install --frozen-lockfile
+      - name: Build pinned Poolboy corpus
+        run: pnpm build:corpus
 
       # On a tag push, refuse to build/publish if the tag and the package
       # version disagree. A manual dispatch from a branch (the "go to
@@ -45,19 +48,29 @@ jobs:
       - run: pnpm verify
       - run: pnpm coverage
 
-      - name: Upload built dist
+      - name: Record corpus revision
+        run: |
+          REVISION="$(sha256sum site/graph.json | cut -d ' ' -f 1)"
+          echo "Poolboy corpus revision: ${REVISION}"
+          echo "Poolboy corpus revision: ${REVISION}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload built package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: dist
-          path: dist/
+          name: package-build
+          path: |
+            dist/
+            site/
           retention-days: 1
 
   # Publish holds the OIDC id-token but runs no third-party code: it only
-  # checks out our own source, pulls in the prebuilt dist/, and publishes.
+  # checks out our own source, pulls in the prebuilt dist/ and site/, and publishes.
   # A tag push pauses here for a required reviewer to approve `release`.
   publish:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.package_version.outputs.version }}
     permissions:
       id-token: write
       contents: read
@@ -70,12 +83,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       # Trusted publishing requires npm >= 11.5.1; guarantee a current npm.
       - run: npm install -g npm@latest
+      - name: Record package version
+        id: package_version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Download built dist
+      - name: Download built package
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: dist
-          path: dist/
+          name: package-build
+          path: .
 
       # Publish the main package first — the wrapper pins it as a dependency.
       # Provenance is generated automatically under OIDC; --provenance is explicit.
@@ -99,3 +117,47 @@ jobs:
           else
             npm publish --provenance --access public --ignore-scripts
           fi
+
+  # Release Pages from the exact published npm package bytes. The build
+  # artifact still feeds npm publish; this job covers idempotent reruns.
+  pages:
+    needs: publish
+    runs-on: ubuntu-latest
+    concurrency:
+      group: poolboy-pages
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Extract published package corpus
+        env:
+          PACKAGE_VERSION: ${{ needs.publish.outputs.package_version }}
+        run: |
+          TARBALL_DIR="${RUNNER_TEMP}/npm-pack"
+          mkdir -p "$TARBALL_DIR"
+          TARBALL_NAME="$(npm pack "@grosspoetrysystems/crooked-pattern@${PACKAGE_VERSION}" \
+            --ignore-scripts --silent --pack-destination "$TARBALL_DIR")"
+          TARBALL="${TARBALL_DIR}/${TARBALL_NAME}"
+          test -f "$TARBALL"
+          tar -xzf "$TARBALL" -C "$TARBALL_DIR"
+          mv "$TARBALL_DIR/package/site" site
+          test -f site/graph.json
+      - name: Record corpus revision
+        run: |
+          REVISION="$(sha256sum site/graph.json | cut -d ' ' -f 1)"
+          echo "Poolboy corpus revision: ${REVISION}"
+          echo "Poolboy corpus revision: ${REVISION}" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
