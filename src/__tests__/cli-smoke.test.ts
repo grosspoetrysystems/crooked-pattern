@@ -1,11 +1,14 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, '../..');
+const site = path.join(root, 'site');
 
 describe('built CLI', () => {
   it('has exactly one shebang after build', async () => {
@@ -38,5 +41,45 @@ describe('built CLI', () => {
     await expect(
       readFile(path.join(outDir, 'ars-report.md'), 'utf8')
     ).resolves.toContain('Agentic Readiness Report');
+  }, 30_000);
+
+  it('reads the bundled docs corpus from an unrelated cwd', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'ars-docs-smoke-'));
+    try {
+      const graph = await readFile(path.join(site, 'graph.json'));
+      const { stdout: indexText } = await execFileAsync(
+        process.execPath,
+        [path.join(root, 'dist/cli.js'), 'docs', '--json'],
+        { cwd }
+      );
+      const index = JSON.parse(indexText) as {
+        revision: string;
+        documents: Array<{ path: string }>;
+      };
+
+      expect(index.revision).toBe(
+        createHash('sha256').update(graph).digest('hex')
+      );
+      expect(
+        index.documents.map(({ path: documentPath }) => documentPath)
+      ).toEqual([
+        '/index.md',
+        '/scan.md',
+        '/diff.md',
+        '/methodology.md',
+        '/releasing.md',
+      ]);
+
+      const { stdout: document } = await execFileAsync(
+        process.execPath,
+        [path.join(root, 'dist/cli.js'), 'docs', 'scan.md'],
+        { cwd }
+      );
+      expect(document.trimEnd()).toBe(
+        (await readFile(path.join(site, 'scan.md'), 'utf8')).trimEnd()
+      );
+    } finally {
+      await rm(cwd, { force: true, recursive: true });
+    }
   }, 30_000);
 });
