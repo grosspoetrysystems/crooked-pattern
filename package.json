@@ -16,7 +16,7 @@
   ],
   "type": "module",
   "packageManager": "pnpm@10.12.1",
-  "files": ["dist", "CHANGELOG.md"],
+  "files": ["dist", "site", "CHANGELOG.md"],
   "bin": {
     "ars": "dist/cli.js",
     "crooked-pattern": "dist/cli.js",
@@ -27,6 +27,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "build:corpus": "npx --yes @grosspoetrysystems/poolboy@0.3.0 check && npx --yes @grosspoetrysystems/poolboy@0.3.0 build",
     "smoke": "pnpm build && node dist/cli.js --help && node dist/cli.js scan --source . --out .tempor/smoke-source",
     "verify": "pnpm check && pnpm lint && pnpm test && pnpm build && pnpm smoke && pnpm knip",
     "check": "tsc --noEmit",

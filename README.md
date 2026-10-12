@@ -25,6 +25,26 @@ Outputs:
 - `ars.json` — stable machine artifact: every check with registry-backed mode, weight, score, evidence metadata, maturity-gate membership, and caveats. Validated before writing.
 - `ars-report.md` — human-readable report: score summary with the exposure multiplier explained, the blocking gate for your next tier, and prioritized recommendations.
 
+### Read the bundled docs offline
+
+The npm package includes the Poolboy-rendered `site/` corpus separately from
+the compiled `dist/` JavaScript. The `ars docs` command reads those bundled
+bytes without making HTTP requests:
+
+```sh
+ars docs                 # list documents and navigation order
+ars docs scan.md         # print one Markdown document
+ars docs --llms          # print llms.txt
+ars docs --graph         # print graph.json, including nav
+ars docs --revision      # print the SHA-256 corpus revision
+```
+
+The revision is the SHA-256 of `graph.json`, whose entries pin every Markdown,
+`llms.txt`, and generated artifact hash. For a released package, compare it
+with the release Pages `graph.json` digest to confirm the npm tarball and Pages
+deployment used the same corpus artifact; the living `main` mirror may move
+independently.
+
 ## Use it as a CI gate
 
 Scans are deterministic (same input, same artifact — no noise tolerance needed), so regressions gate cleanly:

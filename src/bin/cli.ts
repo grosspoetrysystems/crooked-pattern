@@ -7,6 +7,7 @@ import {
 } from '../adapters/supply-chain.js';
 import type { SupplyChainInput } from '../adapters/supply-chain.js';
 import { diffArtifacts } from '../diff.js';
+import { renderDocs } from '../docs.js';
 import { runScan } from '../scan.js';
 
 const program = new Command();
@@ -126,6 +127,54 @@ program
     if (triggered.length)
       throw new Error(`Regression detected: ${triggered.join(', ')}.`);
   });
+
+program
+  .command('docs')
+  .description('Read the bundled documentation corpus offline')
+  .argument('[path]', 'corpus-relative Markdown path')
+  .option('--graph', 'print graph.json, including navigation')
+  .option('--llms', 'print the bundled llms.txt')
+  .option('--revision', 'print the stable graph.json SHA-256 revision')
+  .option('--json', 'print the document index as JSON')
+  .addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  ars docs',
+      '  ars docs scan.md',
+      '  ars docs --graph',
+      '  ars docs --revision',
+    ].join('\n')
+  )
+  .action(
+    async (
+      docPath: string | undefined,
+      opts: {
+        graph?: boolean;
+        llms?: boolean;
+        revision?: boolean;
+        json?: boolean;
+      }
+    ) => {
+      const selected = [opts.graph, opts.llms, opts.revision].filter(
+        Boolean
+      ).length;
+      if (selected > 1 || (selected > 0 && docPath))
+        throw new Error(
+          'Choose one docs path, --graph, --llms, or --revision.'
+        );
+      console.log(
+        await renderDocs({
+          path: docPath,
+          graph: opts.graph,
+          llms: opts.llms,
+          revision: opts.revision,
+          json: opts.json,
+        })
+      );
+    }
+  );
 
 async function loadSupplyChainInput(opts: {
   osvReport?: string;

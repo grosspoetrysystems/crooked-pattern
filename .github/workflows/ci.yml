@@ -21,6 +21,8 @@ jobs:
         with:
           node-version: '24'
       - run: pnpm install --frozen-lockfile
+      - name: Build pinned Poolboy corpus
+        run: pnpm build:corpus
       - run: pnpm verify
       - run: pnpm coverage
       # Dogfood: scan this repo with the scanner it ships. A crash or a
