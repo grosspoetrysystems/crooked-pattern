@@ -4,12 +4,22 @@
 
 It is a pre-flight lint for the agentic web: it measures the presence, coherence, and safety posture of agent-facing signals (crawlability, structure, MCP/OpenAPI surfaces, supply-chain hygiene). It does not measure agent task outcomes — behavioral evaluation is a separate discipline. Every result is evidence-backed and diffable; unknown is reported as unknown, never fabricated into a pass or a fail.
 
+## Documentation
+
+Start with the [published documentation](https://grosspoetrysystems.github.io/crooked-pattern/)
+or a task:
+
+- [Check a website and repository for AI-agent readiness](docs/check-agent-readiness.md)
+- [Prevent agent-readiness regressions in CI](docs/prevent-readiness-regressions.md)
+- [Diagnose and fix readiness tier blockers](docs/fix-readiness-blockers.md)
+
+These guides are authored once in the [documentation corpus](docs/index.md)
+and published by Poolboy.
+
 ## Quick start
 
 ```sh
 npx @grosspoetrysystems/crooked-pattern scan --url https://your-site.com --out ./ars-out
-# ARS final 72/100; readiness 84/100 (6 of 6 categories measured); tier T3 Structured
-# Wrote ars-out/ars.json and ars-out/ars-report.md
 ```
 
 Or install globally — the command is `ars`:
