@@ -32,11 +32,15 @@ Work lands on feature branches → PR into `dev` (CI runs). When `dev` is releas
 
 The version is single-sourced from `package.json` (injected into the CLI and MCP server at build time), so a release bumps **one** number. `pnpm bump` does the lockstep bump across both packages and the wrapper's dependency pin, and stubs a CHANGELOG entry.
 
+Commits must use a conventional header and include a `Signed-off-by` trailer.
+Use `git commit --signoff` (or `-s`) with your configured identity, and sign off
+only when you can certify the [Developer Certificate of Origin](https://developercertificate.org/).
+
 ```sh
 # on dev (or a release branch cut from dev):
 pnpm bump patch          # or minor | major | X.Y.Z
 # fill in the CHANGELOG bullets it stubbed, then:
-git commit -am "chore: release vX.Y.Z"
+git commit -sam "chore: release vX.Y.Z"
 # open a PR dev -> main and merge it (CI must pass).
 ```
 

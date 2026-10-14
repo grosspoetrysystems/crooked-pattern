@@ -1,4 +1,5 @@
 spec = "0.2"
+name = "Crooked Pattern"
 corpus = "docs"
 output = "site"
 ignore = ["packaging"]

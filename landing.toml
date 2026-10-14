@@ -1,0 +1,5 @@
+title = "Crooked Pattern: AI-agent readiness"
+mark = ""
+description = "Check agent-facing website signals and repository safety. Run evidence-backed scans, diagnose readiness blockers, and catch regressions in CI."
+secondary_description = "Ask your agent how to scan a site, interpret a blocked tier, or compare a CI baseline. Documentation published by Poolboy."
+base_url = "https://grosspoetrysystems.github.io/crooked-pattern/"

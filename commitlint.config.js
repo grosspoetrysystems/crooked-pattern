@@ -1,8 +1,7 @@
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'body-empty': [2, 'always'],
-    'footer-empty': [2, 'always'],
+    'trailer-exists': [2, 'always', 'Signed-off-by:'],
     'header-max-length': [2, 'always', 100],
   },
 };
