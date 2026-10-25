@@ -12,6 +12,7 @@ import {
   tagsNamed,
 } from './html.js';
 import { RULE_OF_TWO_LEXICON, type RuleOfTwoClass } from './registry.js';
+import { toolsFromJson } from './tools.js';
 import type { CheckResult } from './types.js';
 
 interface Fetched {
@@ -343,6 +344,7 @@ export async function runWirePass(
     ? plainObject(safeJson<ServerCard>(serverCard.text))
     : undefined;
   const liveTools = extractToolNames(parsedServerCard);
+  const openapiTools = toolsFromOpenapi(openapi);
   const liveToolCount = liveTools.length;
   results.push(
     check(
@@ -361,6 +363,12 @@ export async function runWirePass(
       { wire_value: { live_tool_count: liveToolCount, tools: liveTools } }
     )
   );
+  const openapiCheckValue = {
+    wire_value: {
+      live_tool_count: openapiTools.length,
+      tools: openapiTools,
+    },
+  };
   results.push(
     check(
       'wire.openapi_catalog',
@@ -374,7 +382,8 @@ export async function runWirePass(
         openapi
           ? `API description found at ${openapi.url}.`
           : 'No OpenAPI/API Catalog endpoint found.',
-      ]
+      ],
+      openapiCheckValue
     )
   );
   results.push(
@@ -925,6 +934,20 @@ function jsonObjectWith(
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
     return undefined;
   return keys.some((key) => key in parsed) ? fetched : undefined;
+}
+function toolsFromOpenapi(fetched: Fetched | undefined) {
+  if (!fetched) return [];
+  const parsed = safeJson<Record<string, unknown>>(fetched.text);
+  if (
+    !parsed ||
+    (typeof parsed.openapi !== 'string' &&
+      typeof parsed.swagger !== 'string') ||
+    !parsed.paths ||
+    typeof parsed.paths !== 'object' ||
+    Array.isArray(parsed.paths)
+  )
+    return [];
+  return toolsFromJson(fetched.text).sort();
 }
 
 function plainObject<T>(value: T | undefined): T | undefined {
