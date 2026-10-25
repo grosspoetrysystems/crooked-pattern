@@ -11,6 +11,7 @@ import type {
 } from './adapters/supply-chain.js';
 import { check } from './checks.js';
 import { readLockfileInventory } from './lockfile.js';
+import { toolsFromJson } from './tools.js';
 import type { CheckResult } from './types.js';
 
 /** @public options for programmatic source scans with supply-chain adapters */
@@ -21,11 +22,6 @@ export interface SourcePassOptions {
 interface PackageManifest {
   dependencies?: Record<string, unknown>;
   devDependencies?: Record<string, unknown>;
-}
-
-interface ToolCatalog {
-  tools?: unknown[];
-  paths?: Record<string, unknown>;
 }
 
 const lockfiles = [
@@ -604,32 +600,6 @@ async function readFileSafe(file: string) {
   }
 }
 
-function toolsFromJson(text: string) {
-  const parsed = safeJson<ToolCatalog>(text);
-  const tools = new Set<string>();
-  if (Array.isArray(parsed?.tools)) {
-    for (const tool of parsed.tools) {
-      const name =
-        typeof tool === 'string' ? tool : objectStringValue(tool, 'name');
-      if (typeof name === 'string' && name.trim()) tools.add(name.trim());
-    }
-  }
-  if (parsed?.paths && typeof parsed.paths === 'object') {
-    for (const [route, methods] of Object.entries(parsed.paths)) {
-      if (!methods || typeof methods !== 'object') continue;
-      for (const method of Object.keys(methods))
-        tools.add(`${method.toUpperCase()} ${route}`);
-    }
-  }
-  return [...tools];
-}
-
-function objectStringValue(value: unknown, key: string) {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as Record<string, unknown>;
-  return typeof record[key] === 'string' ? record[key] : undefined;
-}
-
 function toolsFromCode(text: string) {
   const tools = new Set<string>();
   // Only explicit tool-registration calls count as authored tools. Generic
@@ -643,14 +613,6 @@ function toolsFromCode(text: string) {
     for (const match of text.matchAll(pattern)) tools.add(match[1].trim());
   }
   return [...tools];
-}
-
-function safeJson<T>(text: string): T | undefined {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return undefined;
-  }
 }
 
 async function readJson<T>(file: string): Promise<T | undefined> {
