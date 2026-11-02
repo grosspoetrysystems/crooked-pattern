@@ -158,6 +158,8 @@ describe('wire pass branch coverage against a signal-rich site', () => {
     const openapi = findCheck(checks, 'wire.openapi_catalog');
     expect(openapi?.result).toBe('pass');
     expect(openapi?.notes.join(' ')).toContain('api-catalog');
+    const value = openapi?.wire_value as { tools: string[] };
+    expect(value.tools).toEqual([]);
     const oauth = findCheck(checks, 'wire.oauth_discovery');
     expect(oauth?.result).toBe('pass');
     expect(oauth?.notes.join(' ')).toContain('openid-configuration');

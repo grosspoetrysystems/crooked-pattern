@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reconcile authored OpenAPI operations with live OpenAPI operations during BOTH-mode scans, while leaving MCP-specific safety checks unassessed when no MCP server card is served.
+
 ## 0.1.2 — 2026-07-16
 
 - Normalize `bin` paths (`dist/cli.js` instead of `./dist/cli.js`) to stop npm's publish-time "auto-corrected" warning. No behavior change — the commands are unchanged.

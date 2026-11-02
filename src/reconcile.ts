@@ -10,14 +10,25 @@ export function reconcileChecks(checks: CheckResult[]) {
     (check) => check.id === 'source.authored_agent_tools'
   );
   const liveCard = checks.find((check) => check.id === 'wire.mcp_server_card');
-  if (!sourceTools || !liveCard) return;
+  const liveOpenapi = checks.find(
+    (check) => check.id === 'wire.openapi_catalog'
+  );
+  if (!sourceTools || (!liveCard && !liveOpenapi)) return;
 
   const authored = uniqueTools(
     (sourceTools.source_value as ToolEvidence | undefined)?.tools
   );
-  const live = uniqueTools(
-    (liveCard.wire_value as ToolEvidence | undefined)?.tools
-  );
+  const liveCardTools = toolsFromCheck(liveCard);
+  const liveOpenapiTools = toolsFromCheck(liveOpenapi);
+  const live = uniqueTools([...liveCardTools, ...liveOpenapiTools]);
+  const liveSourceLabels: string[] = [];
+  if (liveCard)
+    liveSourceLabels.push(`MCP Server Card (${liveCardTools.length})`);
+  if (liveOpenapi)
+    liveSourceLabels.push(`OpenAPI operations (${liveOpenapiTools.length})`);
+  const liveSourceNote = liveSourceLabels.length
+    ? `Live tools counted from ${liveSourceLabels.join(' and ')}.`
+    : 'No live tool sources were counted.';
 
   if (authored.length === 0 && live.length === 0) {
     checks.push(
@@ -30,7 +41,7 @@ export function reconcileChecks(checks: CheckResult[]) {
         'unknown',
         0,
         [
-          'No authored or live MCP/WebMCP tools detected; no reconciliation comparison was possible.',
+          `No authored or live MCP/WebMCP/OpenAPI tools detected; no reconciliation comparison was possible. ${liveSourceNote}`,
         ],
         {
           source_value: { tool_count: 0, tools: [] },
@@ -70,8 +81,8 @@ export function reconcileChecks(checks: CheckResult[]) {
       agrees ? 100 : scoreForSeverity(sev),
       [
         agrees
-          ? `Authored and live tools match exactly (${authored.length}).`
-          : `Authored tools: ${authored.length}; live tools: ${live.length}; delta: ${delta}; undocumented live tools: ${undocumented.length}.`,
+          ? `Authored and live tools match exactly (${authored.length}). ${liveSourceNote}`
+          : `Authored tools: ${authored.length}; live tools: ${live.length}; delta: ${delta}; undocumented live tools: ${undocumented.length}; missing live tools: ${missingLive.length}. ${liveSourceNote}`,
       ],
       {
         source_value: { tool_count: authored.length, tools: authored },
@@ -87,6 +98,12 @@ export function reconcileChecks(checks: CheckResult[]) {
         },
       }
     )
+  );
+}
+
+function toolsFromCheck(candidate: CheckResult | undefined) {
+  return uniqueTools(
+    (candidate?.wire_value as ToolEvidence | undefined)?.tools
   );
 }
 
